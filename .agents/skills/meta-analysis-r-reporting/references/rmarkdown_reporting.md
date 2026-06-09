@@ -33,6 +33,8 @@ output:
 
 For wide manuscript tables, prefer landscape output. Create a small `landscape_reference.docx` beside the Rmd and point `word_document.reference_docx` to it. Set the Word reference document to landscape orientation with narrow margins; for PDF, use `geometry: landscape,margin=0.45in`.
 
+Use landscape/narrow-margin report geometry whenever a Word or PDF report contains meta-analysis tables wider than about eight columns, long moderator tables, model-status tables with messages, or multi-column publication-bias output. Do not let Word/PDF print raw 10-18 column CSVs in portrait layout. Keep full technical detail in CSV/XLSX exports, and display compact manuscript-facing or checking columns in the report.
+
 PDF rendering requires a LaTeX engine. Always keep the Word output as a fallback because the `.docx` can be exported/saved as PDF from Word when LaTeX is missing. If `rmarkdown::render(..., "pdf_document")` fails because LaTeX is missing, tell the user that the Word file is still usable and can be saved as PDF, then provide TinyTeX installation commands:
 
 ```r
@@ -61,11 +63,13 @@ Save all generated artifacts into that folder or beside the Rmd when the file ty
 - CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `egger.csv`, `PET_PEESE_CR2.csv`.
 - Optional XLSX workbook: `meta_analysis_results.xlsx`.
 - Figures: forest plots, funnel plots, subgroup plots, and moderator scatter plots as `.png`.
-- Text manifest: `output_manifest.csv` or `meta_analysis_report.txt` listing every output path, row count/status, and date-time generated.
-- Rendered reports: HTML and Word at minimum; PDF when LaTeX is available.
-- Word summaries: create two separate files by default when the user asks for a summary/report:
-  - `results_summary.docx`: manuscript-style Results prose with only necessary text-matched figures/tables.
+- Saved source files: copy the main analysis `.R` script plus any helper `.R` or generated `.Rmd` files used for the run into `scripts/` or `source/` under the output folder.
+- Source manifest: `script_manifest.csv` listing source path, saved path, run timestamp, checksum, and file size for every saved R/Rmd source file.
+- Text manifest: `output_manifest.csv` or `meta_analysis_report.txt` listing every output path, row count/status, date-time generated, and saved source files.
+- Word reports: create two files by default when the user asks for a summary/report:
+  - `results_summary.docx`: overview, executive summary, key results, and only relevant text-matched figures/tables.
   - `all_tables_figures_summary.docx`: a checking document containing all generated result tables and every generated figure with short captions.
+- Optional technical reports: create HTML, PDF, or Rmd reports only when the user explicitly asks for them.
 
 When R is not available to Codex, provide RStudio commands and ask the user to run them. After the user returns the output folder or rendered report, inspect the folder directly: read the CSV/XLSX summaries, open or view figure files, check model-status rows, and then give a concise summary of the results and any warnings.
 
@@ -84,6 +88,16 @@ Every Rmd report should include:
 9. Interpretation notes and limitations, including direction handling and whether results use full or influence-excluded data.
 
 Each major analysis section should begin with 1-3 sentences describing what is being tested, whether the full or influence-cleaned dataset is used, and how to interpret the table. Keep large diagnostic/audit data out of Word/PDF; export it as CSV and mention the path.
+
+For display safety, Word/PDF report tables should usually use compact columns:
+
+- main effects: model, dataset, k, n/studies or samples, effect with CI, SE, p, and robust test;
+- moderator omnibus: moderator, status, omnibus test, p, and message;
+- moderator level estimates: moderator or level, k, n/studies, effect with CI, p, robust test, status, and message;
+- publication bias: model, term, k, n/studies, estimate, SE, t/df, p, status, and message;
+- model status: model, status, short message, k, and n/studies.
+
+If a full table is too wide or too long for Word/PDF, show a readable compact view or split it by moderator/analysis family, then point to the complete CSV/XLSX file. Do not squeeze all raw columns into one tiny portrait table.
 
 ## Results-style Word summary
 
@@ -136,7 +150,7 @@ Write `Moderator Analyses` like an article Results section:
 - write separate paragraphs for significant or theoretically central moderators;
 - include level-specific tables only for the moderator currently being discussed;
 - do not discuss every nonsignificant moderator at equal length.
-- In `results_summary.docx`, the Moderator Analyses table should usually be the full manuscript-facing `moderator_table.csv`, including moderator header rows and level rows. Do not reduce it to only omnibus/header rows unless the user asks for a shorter table.
+- In `results_summary.docx`, use a compact moderator overview table when the full moderator table would be too wide. In `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv`, including moderator header rows and level rows. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows and leave omnibus-row formatted p-value cells blank when the p value is already shown in the `F(...)` cell. Level rows should show estimates, CIs, counts, p values, status, and message, but not per-level `t(...)` robust-test strings.
 - Keep the local order as narrative -> table -> matching figure. The combined moderator estimate figure should follow the moderator table, not be delayed until the end of the document.
 
 Split tables by analysis family. Do not combine unrelated outputs into one large table just because they are adjacent in the CSV exports:
@@ -585,7 +599,14 @@ render_meta_table <- function(dat, caption = NULL, bold_rows = integer()) {
     }
     tab <- flextable::fontsize(tab, size = 8, part = "all")
     tab <- flextable::padding(tab, padding = 2, part = "all")
-    return(flextable::autofit(tab))
+    tab <- flextable::set_table_properties(
+      tab,
+      layout = "autofit",
+      width = 1,
+      opts_word = list(split = TRUE, repeat_headers = TRUE)
+    )
+    tab <- flextable::autofit(tab)
+    return(flextable::fit_to_width(tab, max_width = 10.1))
   }
 
   knitr::kable(dat, caption = caption)
@@ -600,23 +621,58 @@ render_meta_table(
 
 Do not use screenshots as table content. Screenshots can guide formatting, but tables must be generated from model objects and conversion logs.
 
+Before printing a table in Word/PDF, reduce it to display columns and format long fields. Truncate or wrap `message`, `status`, and robust-test text; round numeric columns; and split large moderator tables into one table per moderator or one table per analysis family. Preserve complete untruncated values in the exported CSV/XLSX files.
+
 ## Figures
 
-Use R chunks for generated figures, not only pre-existing image files. Example chunk content:
+Use R chunks for generated figures, not only pre-existing image files. For study-level forest plots, preserve dependent effect-size structure by placing multiple effect-size dots/CIs on the same study row when one study reports multiple effects. Do not silently collapse each study to one dot unless the user explicitly asks for aggregation. Example chunk content:
 
 ```r
-forest_dat <- dat_use %>%
-  dplyr::group_by(study_id_clean) %>%
+study_order <- dat_use %>%
+  dplyr::mutate(w = 1 / vi) %>%
+  dplyr::group_by(study_id_clean, study_label) %>%
   dplyr::summarise(
-    yi = stats::weighted.mean(yi, w = 1 / vi),
-    vi = 1 / sum(1 / vi),
-    label = dplyr::first(author),
+    k_effects = dplyr::n(),
+    study_mean = sum(w * yi) / sum(w),
     .groups = "drop"
+  ) %>%
+  dplyr::arrange(study_mean) %>%
+  dplyr::mutate(
+    study_row = dplyr::row_number(),
+    label = paste0(study_label, " (k=", k_effects, ")")
   )
 
+forest_dat <- dat_use %>%
+  dplyr::mutate(
+    ci_lb = yi - 1.96 * sqrt(vi),
+    ci_ub = yi + 1.96 * sqrt(vi),
+    effect_significant = !is.na(ci_lb) & !is.na(ci_ub) & (ci_lb > 0 | ci_ub < 0)
+  ) %>%
+  dplyr::left_join(
+    study_order %>% dplyr::select(study_id_clean, study_row, label, k_effects),
+    by = "study_id_clean"
+  ) %>%
+  dplyr::group_by(study_id_clean) %>%
+  dplyr::arrange(yi, .by_group = TRUE) %>%
+  dplyr::mutate(
+    effect_offset = ifelse(dplyr::n() == 1, 0, seq(-0.28, 0.28, length.out = dplyr::n())),
+    y_pos = study_row + effect_offset
+  ) %>%
+  dplyr::ungroup()
+
 if (nrow(forest_dat) >= 2) {
-  fit_forest <- metafor::rma(yi = yi, vi = vi, data = forest_dat, method = "REML")
-  metafor::forest(fit_forest, slab = forest_dat$label)
+  ggplot2::ggplot(forest_dat, ggplot2::aes(x = yi, y = y_pos)) +
+    ggplot2::geom_vline(xintercept = 0, color = "grey55") +
+    ggplot2::geom_errorbarh(ggplot2::aes(xmin = ci_lb, xmax = ci_ub), height = 0) +
+    ggplot2::geom_point(ggplot2::aes(fill = effect_significant), shape = 21, color = "#1f78b4", size = 1.4, stroke = 0.35) +
+    ggplot2::scale_fill_manual(values = c("FALSE" = "#ffffff", "TRUE" = "#1f78b4"), guide = "none") +
+    ggplot2::scale_y_continuous(breaks = study_order$study_row, labels = study_order$label) +
+    ggplot2::labs(
+      x = "Effect size",
+      y = NULL,
+      caption = "Note. Study-level forest plot with effect-size CIs. Filled blue dots have 95% CIs excluding 0; empty dots include 0."
+    ) +
+    ggplot2::theme(plot.caption = ggplot2::element_text(hjust = 0))
 } else {
   plot.new()
   text(.5, .5, "Forest plot skipped: fewer than two studies.")
@@ -625,12 +681,66 @@ if (nrow(forest_dat) >= 2) {
 
 In the actual Rmd, wrap it in an R chunk named `forest-plot` with a figure caption and `fig.height = 8`, then place the code above in the chunk.
 
+For report and presentation exports, save study-level forest plots as high-resolution PNGs with a white background before inserting them into Word. When the study-level forest plot has more than about 30 study rows, split it into multiple readable panels of about 30 study rows per image rather than one oversized vertical PNG. Each chunk should keep multiple effect-size dots/CIs on the same study row, retain the zero and pooled-effect reference lines, and use clear Word headings such as `Study-level forest plot, studies 1-30`. Put titles/subtitles inside figure notes rather than top-of-plot text: standalone PNGs should use a bottom caption such as `labs(caption = "Note. Study-level forest plot with effect-size CIs. Studies 1-30 of 132; ...")`, and Word reports should repeat the same note below the inserted image. A good export default for a chunked dense forest plot is at least 450-600 dpi with a wider canvas than the inserted Word size, for example `ggsave("study_level_forest_full_data_part_01.png", plot = forest_plot, width = 12, height = max(6, 0.32 * n_studies_in_chunk + 1.8), dpi = 600, limitsize = FALSE, bg = "white")`.
+
 Also include funnel plots and key moderator plots when data permit:
 
 - `funnel_full_data`
 - `funnel_no_outliers`
 - continuous moderator scatter plots such as gender/female proportion
 - subgroup forest plots only when each subgroup has enough rows
+
+Funnel plots should use a classic publication-bias display by default: black points, grey panel, reversed standard-error axis, pooled-effect center line, and pseudo 95% funnel guides. Use metric-specific x-axis labels, such as `Effect size (Fisher's z)` for Fisher-z/r analyses and `Effect size (Hedges g)` for SMD analyses. If extreme effects flatten the display, use a readable zoomed funnel and disclose the number of effects outside the displayed window. Example pattern:
+
+```r
+funnel_center <- main_summary$estimate[1]
+funnel_se_max <- as.numeric(stats::quantile(dat_use$sei, 0.99, na.rm = TRUE))
+funnel_x_quantile <- as.numeric(stats::quantile(dat_use$yi, c(0.025, 0.975), na.rm = TRUE))
+funnel_x_min <- min(funnel_x_quantile[1], funnel_center - 1.96 * funnel_se_max)
+funnel_x_max <- max(funnel_x_quantile[2], funnel_center + 1.96 * funnel_se_max)
+funnel_x_pad <- 0.08 * diff(c(funnel_x_min, funnel_x_max))
+funnel_x_min <- funnel_x_min - funnel_x_pad
+funnel_x_max <- funnel_x_max + funnel_x_pad
+
+funnel_plot_dat <- dat_use %>%
+  dplyr::mutate(in_funnel_view = yi >= funnel_x_min & yi <= funnel_x_max & sei <= funnel_se_max) %>%
+  dplyr::filter(in_funnel_view)
+
+funnel_se_grid <- tibble::tibble(sei = seq(0, funnel_se_max, length.out = 200)) %>%
+  dplyr::mutate(
+    ci_left = funnel_center - 1.96 * sei,
+    ci_right = funnel_center + 1.96 * sei
+  )
+
+funnel_core <- dplyr::bind_rows(
+  tibble::tibble(yi = funnel_center, sei = 0),
+  funnel_se_grid %>% dplyr::transmute(yi = ci_left, sei = sei),
+  funnel_se_grid %>% dplyr::arrange(dplyr::desc(sei)) %>% dplyr::transmute(yi = ci_right, sei = sei)
+)
+
+ggplot2::ggplot() +
+  ggplot2::geom_polygon(data = funnel_core, ggplot2::aes(x = yi, y = sei), fill = "white", color = NA) +
+  ggplot2::geom_line(data = funnel_se_grid, ggplot2::aes(x = ci_left, y = sei), color = "grey35") +
+  ggplot2::geom_line(data = funnel_se_grid, ggplot2::aes(x = ci_right, y = sei), color = "grey35") +
+  ggplot2::geom_vline(xintercept = funnel_center, color = "grey20") +
+  ggplot2::geom_point(data = funnel_plot_dat, ggplot2::aes(x = yi, y = sei), color = "black", size = 1.6) +
+  ggplot2::scale_y_reverse() +
+  ggplot2::coord_cartesian(xlim = c(funnel_x_min, funnel_x_max), ylim = c(funnel_se_max, 0)) +
+  ggplot2::labs(
+    x = "Effect size (Hedges g)",
+    y = "Standard Error",
+    caption = paste0("Note. Funnel plot. ", nrow(dat_use) - nrow(funnel_plot_dat), " effects outside the displayed zoom window.")
+  ) +
+  ggplot2::theme(
+    panel.background = ggplot2::element_rect(fill = "#c9c9c9", color = NA),
+    plot.background = ggplot2::element_rect(fill = "white", color = NA),
+    panel.grid.major = ggplot2::element_line(color = "white"),
+    panel.grid.minor = ggplot2::element_blank(),
+    plot.caption = ggplot2::element_text(hjust = 0)
+  )
+```
+
+Bound figure size in Word/PDF. Tall PNGs such as forest plots and leave-one-study influence plots should be inserted with a maximum height that fits the landscape page body, not only a large `out.width`. If a source figure is vertical, reduce output width or use an explicit helper that preserves aspect ratio while capping both width and height. A good default for landscape Letter with 0.45 inch margins is maximum width 10.1 inches and maximum height 6.6 inches.
 
 ## Export and knit commands
 
