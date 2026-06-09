@@ -41,9 +41,50 @@ In this repository, the skill tells Codex how to handle meta-analysis projects c
 - produce forest plots, funnel plots, scatter plots, and moderator figures;
 - generate manuscript-ready Word, HTML, or PDF R Markdown reports.
 
+## Installation
+
+### Recommended: install with Codex
+
+In Codex, ask:
+
+```text
+Use $skill-installer.
+
+Install the skill from:
+https://github.com/kimyaqmy/Meta/tree/main/.agents/skills/meta-analysis-r-reporting
+```
+
+After installation, restart Codex so the new skill is available.
+
+To verify that Codex can see the skill, start a new task with:
+
+```text
+Use $meta-analysis-r-reporting.
+```
+
+### Manual fallback
+
+If you prefer to install the skill manually, copy this folder:
+
+```text
+.agents/skills/meta-analysis-r-reporting
+```
+
+into your local Codex skills directory as:
+
+```text
+~/.codex/skills/meta-analysis-r-reporting
+```
+
+Then restart Codex and start a new task with:
+
+```text
+Use $meta-analysis-r-reporting.
+```
+
 ## How to Use This Skill in Codex
 
-Open this repository in Codex, then start your task with:
+After installing the skill, or after opening this repository directly in Codex, start your task with:
 
 ```text
 Use $meta-analysis-r-reporting.
