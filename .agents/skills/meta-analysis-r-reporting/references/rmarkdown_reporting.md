@@ -58,6 +58,8 @@ OUTPUT_DIR <- "meta_analysis_outputs_project_name"
 dir.create(OUTPUT_DIR, showWarnings = FALSE, recursive = TRUE)
 ```
 
+Clear previously generated figures (and any panel-numbered images) at the start of each run, for example `file.remove(list.files(figdir, pattern = "\\.png$", full.names = TRUE))`. Otherwise stale panels from an earlier panel size or moderator set linger in the folder and get picked up by the all-figures report (e.g. a `..._part_05.png` left behind after switching from 30 to 40 rows per panel). Build the report's figure list from the paths actually written by this run, not from a directory glob.
+
 Save all generated artifacts into that folder or beside the Rmd when the file type is a rendered report:
 
 - CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `publication_bias.csv` (multilevel Egger test).
@@ -189,6 +191,13 @@ Select figures to match the text:
 
 For categorical moderator figures, prefer a combined moderator estimate plot over many separate boxplots. The combined plot should resemble a manuscript forest/table hybrid: moderator sections, level labels, point estimates, 95% CIs, a reference line at zero, and right-side columns for study count, effect count, and formatted CI.
 
+Lay this hybrid out so the numbers never overlap the data:
+
+- Group by moderator with `facet_grid(moderator ~ ., scales = "free_y", space = "free_y", switch = "y")` and left-placed bold strip labels, so each moderator is a clearly separated section.
+- Place the numeric columns (`g [95% CI]`, `k / n`) as text in a reserved strip to the right of the data range, using fixed x positions beyond `max(ci_ub)` with `coord_cartesian(clip = "off")` and a right plot margin. Do not print the labels next to each point with `hjust`, because they then sit on top of the dots and CIs and run off the panel edge.
+- Encode significance by fill (filled dot when the 95% CI excludes 0, hollow dot otherwise) rather than by a rainbow color-per-moderator legend.
+- Keep the bottom caption short enough to fit the plot width; a long single-line caption is clipped at the right edge. Reserve the right strip generously (for example up to ~0.9 x the data span) so the widest `g [95% CI]` and `k / n` strings fit.
+
 Also create an all-tables-and-figures summary document. This second document is not the manuscript-style Results summary. It should include all generated result tables plus every generated figure in the output folder, including dense forest plots, funnel plots, moderator plots, scatter plots, influence plots, and any other PNG/JPG figures. Keep captions short and file-based, optionally grouped by type:
 
 - `Forest plots`
@@ -200,7 +209,9 @@ Also create an all-tables-and-figures summary document. This second document is 
 
 The all-tables-and-figures summary is for checking completeness and visual QA, so do not exclude nonsignificant results from it. If a table is very large or too wide for Word, show a readable preview and link/note the full CSV/XLSX output path. If a figure is blank, unreadable, or too dense, include it and add a short note that it needs checking or may be better kept as a separate file.
 
-If R Markdown rendering is unavailable, hangs, or fails because LaTeX/Pandoc/Word conversion is unavailable, build the Word summary directly from saved CSV/XLSX/PNG outputs. The direct Word summary should follow the same Results structure and should still be verified structurally or through Word/LibreOffice rendering when possible.
+If R Markdown rendering is unavailable, hangs, or fails because LaTeX/Pandoc/Word conversion is unavailable, build the Word summary directly from saved CSV/XLSX/PNG outputs (for example with `officer` + `flextable`). The direct Word summary should follow the same Results structure and should still be verified structurally or through Word/LibreOffice rendering when possible.
+
+When building Word tables directly with `flextable`/`officer`, constrain every table to the page width: `set_table_properties(layout = "autofit", width = 1)` (and/or `flextable::fit_to_width(max_width = ...)`). Do not finish with a bare `autofit()`, which sizes columns to content and can push a wide manuscript table past the right page margin so the leftmost columns are clipped off the page. For wide tables (overall-effect, full moderator table), set the document's default section to landscape with narrow margins via `officer::body_set_default_section(doc, officer::prop_section(page_size = officer::page_size(orient = "landscape"), page_margins = officer::page_mar(left = 0.5, right = 0.5)))`. Always render the finished `.docx` to PDF/PNG and confirm no table is clipped before delivering — column clipping is invisible in the `.docx` XML and only shows on render.
 
 When the report is meant to reproduce or compare against a published article, add a short consistency-check section near the beginning. The primary comparison should use the full-data model unless the article explicitly excluded outliers/influential cases from its main analysis. Put no-outlier or influence-cleaned results in a sensitivity-analysis section, not as the primary article-comparison result.
 
@@ -344,6 +355,8 @@ For multilevel `rma.mv()` objects, extract coefficients with `stats::coef(fit)` 
 Do not let model failures turn into all-`NA` result rows without explanation. In R Markdown reports, use a model helper that returns both `fit` and a `status` table, and print the status table whenever a model fails.
 
 Describe influence cleaning explicitly. Use a transparent rule, such as Cook's distance from the full model with influential effects flagged at `Cook's D > 4/k`, where `k` is the number of model-ready effects. State that this is effect-level screening, not manual study deletion, and report both the number of flagged effects and the number of studies represented among those effects. Export the full influence diagnostic table to CSV.
+
+When any effects are flagged, also include a dedicated table of the flagged influential effects in the manuscript-facing sensitivity section of `results_summary.docx` (not only the all-tables document). List one row per flagged effect with its study and effect ids, a few identifying descriptors (the central moderators, e.g. intervention type, domain, level), the effect size and SE, its Cook's D, the cutoff, and how far it exceeds the cutoff (a `ratio = Cook's D / cutoff`), sorted by Cook's D descending. This lets a reader see exactly which effects drove the sensitivity analysis. Export the same table to CSV (for example `influence_flagged_effects.csv`).
 
 For article replication, include both model rows but label their role clearly:
 
@@ -628,12 +641,19 @@ Before printing a table in Word/PDF, reduce it to display columns and format lon
 Use R chunks for generated figures, not only pre-existing image files. For study-level forest plots, preserve dependent effect-size structure by placing multiple effect-size dots/CIs on the same study row when one study reports multiple effects. Do not silently collapse each study to one dot unless the user explicitly asks for aggregation. Example chunk content:
 
 ```r
+# Aggregate to ONE row per study. Group by the study id only and pick a single
+# representative label; do NOT group by a subsample- or sample-name-unique label,
+# or a study that spans several subsamples becomes several rows. After building
+# this table, assert nrow(study_order) == dplyr::n_distinct(dat_use$study_id_clean):
+# if study_order has more than one row per study, the join below (by study_id_clean)
+# silently duplicates effect rows and the forest shows more rows than studies.
 study_order <- dat_use %>%
   dplyr::mutate(w = 1 / vi) %>%
-  dplyr::group_by(study_id_clean, study_label) %>%
+  dplyr::group_by(study_id_clean) %>%
   dplyr::summarise(
     k_effects = dplyr::n(),
     study_mean = sum(w * yi) / sum(w),
+    study_label = dplyr::first(study_label),
     .groups = "drop"
   ) %>%
   dplyr::arrange(study_mean) %>%
@@ -641,6 +661,7 @@ study_order <- dat_use %>%
     study_row = dplyr::row_number(),
     label = paste0(study_label, " (k=", k_effects, ")")
   )
+stopifnot(nrow(study_order) == dplyr::n_distinct(dat_use$study_id_clean))
 
 forest_dat <- dat_use %>%
   dplyr::mutate(
@@ -681,7 +702,7 @@ if (nrow(forest_dat) >= 2) {
 
 In the actual Rmd, wrap it in an R chunk named `forest-plot` with a figure caption and `fig.height = 8`, then place the code above in the chunk.
 
-For report and presentation exports, save study-level forest plots as high-resolution PNGs with a white background before inserting them into Word. When the study-level forest plot has more than about 30 study rows, split it into multiple readable panels of about 30 study rows per image rather than one oversized vertical PNG. Each chunk should keep multiple effect-size dots/CIs on the same study row, retain the zero and pooled-effect reference lines, and use clear Word headings such as `Study-level forest plot, studies 1-30`. Put titles/subtitles inside figure notes rather than top-of-plot text: standalone PNGs should use a bottom caption such as `labs(caption = "Note. Study-level forest plot with effect-size CIs. Studies 1-30 of 132; ...")`, and Word reports should repeat the same note below the inserted image. A good export default for a chunked dense forest plot is at least 450-600 dpi with a wider canvas than the inserted Word size, for example `ggsave("study_level_forest_full_data_part_01.png", plot = forest_plot, width = 12, height = max(6, 0.32 * n_studies_in_chunk + 1.8), dpi = 600, limitsize = FALSE, bg = "white")`.
+For report and presentation exports, save study-level forest plots as high-resolution PNGs with a white background before inserting them into Word. When the study-level forest plot has more than about 30-40 study rows, split it into multiple readable panels (about 30-40 study rows per image, configurable) rather than one oversized vertical PNG. Each chunk should keep multiple effect-size dots/CIs on the same study row, retain the zero and pooled-effect reference lines, and use clear Word headings such as `Study-level forest plot, studies 1-40`. Put titles/subtitles inside figure notes rather than top-of-plot text: standalone PNGs should use a bottom caption such as `labs(caption = "Note. Study-level forest plot with effect-size CIs. Studies 1-40 of 132; ...")`, and Word reports should repeat the same note below the inserted image. A good export default for a chunked dense forest plot is at least 450-600 dpi with a wider canvas than the inserted Word size, rendered through a high-quality device such as `ragg::agg_png` for crisp text, for example `ggsave("study_level_forest_full_data_part_01.png", plot = forest_plot, width = 12, height = max(6, 0.28 * n_studies_in_chunk + 1.8), dpi = 600, limitsize = FALSE, bg = "white", device = ragg::agg_png)`.
 
 Also include funnel plots and key moderator plots when data permit:
 
