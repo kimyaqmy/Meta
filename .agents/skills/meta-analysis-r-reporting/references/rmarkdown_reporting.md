@@ -10,7 +10,7 @@ Create an `.Rmd` beside the data file or beside the adapted R script. Prefer rel
 DATA_PATH <- "test_data.csv"
 ```
 
-Include HTML, Word, and PDF outputs unless the user asks for one format only:
+By default produce only the two Word deliverables (`results_summary.docx` and `all_tables_figures_summary.docx`); create HTML, PDF, or Rmd technical reports only when the user explicitly asks for them. When the user does request multiple formats, use YAML like:
 
 ```yaml
 geometry: landscape,margin=0.45in
@@ -60,7 +60,7 @@ dir.create(OUTPUT_DIR, showWarnings = FALSE, recursive = TRUE)
 
 Save all generated artifacts into that folder or beside the Rmd when the file type is a rendered report:
 
-- CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `egger.csv`, `PET_PEESE_CR2.csv`.
+- CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `publication_bias.csv` (multilevel Egger test).
 - Optional XLSX workbook: `meta_analysis_results.xlsx`.
 - Figures: forest plots, funnel plots, subgroup plots, and moderator scatter plots as `.png`.
 - Saved source files: copy the main analysis `.R` script plus any helper `.R` or generated `.Rmd` files used for the run into `scripts/` or `source/` under the output folder.
@@ -71,7 +71,7 @@ Save all generated artifacts into that folder or beside the Rmd when the file ty
   - `all_tables_figures_summary.docx`: a checking document containing all generated result tables and every generated figure with short captions.
 - Optional technical reports: create HTML, PDF, or Rmd reports only when the user explicitly asks for them.
 
-When R is not available to Codex, provide RStudio commands and ask the user to run them. After the user returns the output folder or rendered report, inspect the folder directly: read the CSV/XLSX summaries, open or view figure files, check model-status rows, and then give a concise summary of the results and any warnings.
+When R is not available to the agent, provide RStudio commands and ask the user to run them. After the user returns the output folder or rendered report, inspect the folder directly: read the CSV/XLSX summaries, open or view figure files, check model-status rows, and then give a concise summary of the results and any warnings.
 
 ## Required report sections
 
@@ -83,7 +83,7 @@ Every Rmd report should include:
 4. Robust/CR2 table when available.
 5. Moderator analyses table in manuscript-ready format.
 6. Moderator count table in long format exported to CSV.
-7. Publication-bias table: multilevel Egger and PET/PEESE when available.
+7. Publication-bias table: the multilevel Egger test (effect sizes regressed on standard errors with CR2 robust inference). Do not also fit PET (identical to Egger-on-SE) or PEESE unless explicitly requested.
 8. Figures: forest plot, funnel plot, and any requested moderator scatter/subgroup figures.
 9. Interpretation notes and limitations, including direction handling and whether results use full or influence-excluded data.
 
@@ -138,7 +138,7 @@ Write the `Overall Effect` section as prose first, then table:
 
 - identify the model type, such as three-level multilevel meta-analysis;
 - state whether the result is full data or influence-cleaned;
-- report `g [95% CI]` or `r [95% CI]`, SE, p, and CR2 robust test;
+- report `g [95% CI]` or `r [95% CI]`, the 95% prediction interval, SE, p, and CR2 robust test;
 - interpret direction and magnitude cautiously;
 - put influence-cleaned/no-outlier results in a sensitivity paragraph unless it is the user's defined main model.
 
@@ -150,7 +150,7 @@ Write `Moderator Analyses` like an article Results section:
 - write separate paragraphs for significant or theoretically central moderators;
 - include level-specific tables only for the moderator currently being discussed;
 - do not discuss every nonsignificant moderator at equal length.
-- In `results_summary.docx`, use a compact moderator overview table when the full moderator table would be too wide. In `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv`, including moderator header rows and level rows. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows and leave omnibus-row formatted p-value cells blank when the p value is already shown in the `F(...)` cell. Level rows should show estimates, CIs, counts, p values, status, and message, but not per-level `t(...)` robust-test strings.
+- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns.
 - Keep the local order as narrative -> table -> matching figure. The combined moderator estimate figure should follow the moderator table, not be delayed until the end of the document.
 
 Split tables by analysis family. Do not combine unrelated outputs into one large table just because they are adjacent in the CSV exports:
@@ -160,16 +160,15 @@ Split tables by analysis family. Do not combine unrelated outputs into one large
 - Table: selected level-specific moderator estimates.
 - Table: continuous moderators.
 - Table: multilevel Egger test.
-- Table: PET/PEESE tests.
 - Table: influence diagnostics or excluded/flagged studies, only if needed.
 
-For publication bias, use separate prose and separate tables:
+For publication bias, use a short prose paragraph followed by the table:
 
 ```text
-The multilevel Egger test treated sqrt(vi) as a moderator. In the full-data model, the Egger slope was ..., indicating ... . PET and PEESE were then run as sensitivity checks. Because PET/PEESE intercepts were not significant, publication-bias evidence should be described as mixed rather than definitive.
+A multilevel Egger test regressed effect sizes on their standard errors within the multilevel model, with CR2 robust inference. In the full-data model, the Egger slope was ..., indicating ... . Because dependent effect sizes are nested within studies, this check should be interpreted cautiously.
 ```
 
-Keep the multilevel Egger table separate from the PET/PEESE table. The Egger table should include `model`, `test`, `k`, `n`, `estimate`, `SE`, `t`, `df`, `p`, and `status`. The PET/PEESE table should include `model`, `intercept`, `SE`, `t`, `df`, `p`, and `status`.
+The Egger table should include `model`, `term`, `k`, `n`, `estimate`, `SE`, `t`, `df`, `p`, and `status`. Do not add PET or PEESE rows: PET duplicates the Egger-on-SE regression, and PEESE is out of scope unless the user explicitly requests it.
 
 Use clean manuscript formatting:
 
@@ -298,21 +297,20 @@ Use manuscript-ready columns, not only a minimal estimate table. For Fisher-z mo
 
 Recommended columns for the overall/main table:
 
-- `Correlate`
-- `k`
-- `n`
-- `yi`
-- `vi`
-- `r [95% CI]`
+- `model`
+- `dataset`
+- `k_effects`
+- `n_studies`
+- `n_samples` when available
+- `r [95% CI]` or `g [95% CI]`
 - `SE`
 - `p`
-- `tau^2(2)`
-- `tau^2(3)`
-- `R^2(2)`
-- `R^2(3)`
-- `Robust Test`
+- `Q_statistics`, formatted as `Q(df) = value, p < .001`
+- `I2_total`
+- `I2_between`
+- `I2_within`
 
-Do not include a separate `z` column in manuscript-facing tables unless the user explicitly asks for it. For Fisher-z models, `yi` already carries the pooled Fisher-z estimate; use `r [95% CI]` for interpretation and keep Fisher-z details in the audit table if needed.
+Do not include separate `robust_test` or `z` columns in manuscript-facing overall-effect tables unless the user explicitly asks for them. For Fisher-z models, use `r [95% CI]` for interpretation and keep Fisher-z details in the audit table if needed.
 
 ```r
 format_p <- function(p) {
@@ -333,7 +331,12 @@ main_summary_raw <- dplyr::bind_rows(
 )
 
 main_summary <- main_summary_raw %>%
-  dplyr::left_join(robust_labels, by = "Correlate")
+  dplyr::mutate(
+    Q_statistics = format_q_statistic(fit),
+    I2_total = i2$total,
+    I2_between = i2$between_study,
+    I2_within = i2$within_study
+  )
 ```
 
 For multilevel `rma.mv()` objects, extract coefficients with `stats::coef(fit)` and `stats::vcov(fit)` rather than relying only on `summary(fit)$beta`, because the summary object can differ across `metafor` versions or fail silently when the model did not fit.
@@ -410,7 +413,7 @@ if (any(model_status$status != "ok")) {
 }
 ```
 
-For CR2 robust tests, do not assume the intercept row is always named the same way. Accept `intrcpt`, `Intercept`, or `(Intercept)` when building the `Robust Test` label.
+For CR2 robust tests, do not assume the intercept row is always named the same way. Accept `intrcpt`, `Intercept`, or `(Intercept)` when building internal robust-test labels, but do not put those labels in manuscript-facing overall-effect tables unless the user asks.
 
 For manuscript-facing labels, strip the word `Robust` from CR2 omnibus display cells. Keep CR2/robust wording in table notes or methods prose, but not in each cell. Use a formatter like:
 
@@ -429,21 +432,20 @@ For example, `Robust F(5, 16.02) = 9.46, p = <.001` should be displayed as `F(5,
 
 The moderator table should resemble manuscript tables, not just raw coefficient output. By default, use the same visible header style as the overall/main effect table. Use one section/header row per moderator and one indented row per level.
 
-Recommended columns:
+Recommended APA-style columns:
 
-- `Correlate`
+- `Moderation`
 - `k`
 - `n`
-- `r [95% CI]` or `g [95% CI]`
+- `Estimate [95% CI]`
 - `SE`
 - `p`
-- `tau^2(2)`
-- `tau^2(3)`
-- `R^2(2)`
-- `R^2(3)`
-- `Robust Test`
+- `R2_between`
+- `R2_within`
+- `Omnibus Test`
+- `status`
 
-For correlation/Fisher-z analyses, report `r [95% CI]` after back-transforming. For SMD analyses, report Hedges `g [95% CI]` or SMD on the model scale.
+For correlation/Fisher-z analyses, report back-transformed `r [95% CI]` values inside `Estimate [95% CI]`. For SMD analyses, report Hedges `g [95% CI]` or SMD on the model scale. Use `k` for effect sizes and `n` for distinct studies unless the source workbook has a reliable participant `N` column and the user asks for participant counts.
 
 Pattern:
 
@@ -505,17 +507,16 @@ make_level_rows <- function(dat, moderator, fit_set = NULL, metric = "r") {
 
   dplyr::left_join(counts, est, by = "level") %>%
     dplyr::transmute(
-      Correlate = paste0("  ", level),
+      Moderation = paste0("  ", level),
       k = k_effects,
       n = n_studies,
-      `r [95% CI]` = sprintf("%.2f [%.2f, %.2f]", estimate, ci_lb, ci_ub),
+      `Estimate [95% CI]` = sprintf("%.2f [%.2f, %.2f]", estimate, ci_lb, ci_ub),
       SE = sprintf("%.2f", se),
       p = format_p(p_value),
-      `tau^2(2)` = "",
-      `tau^2(3)` = "",
-      `R^2(2)` = "",
-      `R^2(3)` = "",
-      `Robust Test` = ""
+      `R2_between` = "",
+      `R2_within` = "",
+      `Omnibus Test` = "",
+      status = "ok"
     )
 }
 ```
@@ -529,17 +530,16 @@ make_moderator_section <- function(dat, moderator, omnibus_label = "") {
   omnibus_label <- format_omnibus_label(omnibus_label)
 
   header <- tibble::tibble(
-    Correlate = moderator,
+    Moderation = moderator,
     k = nrow(dat),
     n = dplyr::n_distinct(dat$study_id_clean),
-    `r [95% CI]` = "",
+    `Estimate [95% CI]` = "",
     SE = "",
     p = "",
-    `tau^2(2)` = "",
-    `tau^2(3)` = "",
-    `R^2(2)` = "",
-    `R^2(3)` = "",
-    `Robust Test` = omnibus_label
+    `R2_between` = "",
+    `R2_within` = "",
+    `Omnibus Test` = omnibus_label,
+    status = "ok"
   )
 
   dplyr::bind_rows(header, rows)
@@ -574,7 +574,7 @@ For article-style reporting, use table captions that reveal the analytic sample,
 - `Moderator analyses for overall effect: full data, article-comparison model`.
 - `Moderator analyses for overall effect: influence-cleaned sensitivity model`.
 
-Before `dplyr::bind_rows()` combines moderator header rows and level rows, make display-only columns the same type. Header rows often contain numeric heterogeneity values and blank estimate cells, while level rows contain numeric estimates and blank heterogeneity cells. Convert manuscript-display columns such as `r [95% CI]`, `g [95% CI]`, `SE`, `p`, `tau^2(2)`, `tau^2(3)`, `R^2(2)`, `R^2(3)`, and `Robust Test` to character strings before binding; keep count columns such as `k` and `n` numeric.
+Before `dplyr::bind_rows()` combines moderator header rows and level rows, make display-only columns the same type. Header rows often contain pseudo-R2 values and blank estimate cells, while level rows contain numeric estimates and blank omnibus-test cells. Convert manuscript-display columns such as `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, and `Omnibus Test` to character strings before binding; keep count columns such as `k` and `n` numeric.
 
 ## Table rendering
 
@@ -615,13 +615,13 @@ render_meta_table <- function(dat, caption = NULL, bold_rows = integer()) {
 render_meta_table(
   moderator_table,
   caption = "Moderator analyses for overall effect",
-  bold_rows = which(moderator_table$Correlate %in% categorical_moderators)
+  bold_rows = which(moderator_table$Moderation %in% categorical_moderators)
 )
 ```
 
 Do not use screenshots as table content. Screenshots can guide formatting, but tables must be generated from model objects and conversion logs.
 
-Before printing a table in Word/PDF, reduce it to display columns and format long fields. Truncate or wrap `message`, `status`, and robust-test text; round numeric columns; and split large moderator tables into one table per moderator or one table per analysis family. Preserve complete untruncated values in the exported CSV/XLSX files.
+Before printing a table in Word/PDF, reduce it to display columns and format long fields. For moderator tables, drop technical `message` columns from manuscript-facing CSV/XLSX/Word outputs, keep CR2 `F(...)` strings only in `Omnibus Test` on moderator/header rows, and round numeric columns. Preserve complete technical diagnostics in `model_status.csv` or a separate audit table when needed.
 
 ## Figures
 

@@ -122,9 +122,9 @@ Do not change model inputs while only changing display labels.
 
 ### 10. Optional moderator and plot guards
 
-Before adapting optional blocks such as `white_proportion`, `gender_proportion`, scatter plots, moderator plots, funnel plots, PET/PEESE, or subgroup forest plots, read `optional_module_guards.md`.
+Before adapting optional blocks such as `white_proportion`, `gender_proportion`, scatter plots, moderator plots, funnel plots, publication-bias models, or subgroup forest plots, read `optional_module_guards.md`. If the reference script contains PET/PEESE blocks, drop them when adapting: the default publication-bias check is a single multilevel Egger test.
 
-If a column is only present because `cols_needed` created it as `NA`, skip its analysis block with a clear message. Do not let all-NA optional columns flow into `facet_wrap()`, `rma.mv()`, funnel plots, or PET/PEESE models.
+If a column is only present because `cols_needed` created it as `NA`, skip its analysis block with a clear message. Do not let all-NA optional columns flow into `facet_wrap()`, `rma.mv()`, funnel plots, or publication-bias models.
 
 Also guard the printed example blocks at the end of the reference script. If helpers such as `summarise_categorical_levels_CR2_p()` return `NULL`, skip the example instead of piping the `NULL` object into `dplyr::select()` or `print()`.
 

@@ -135,7 +135,7 @@ The reference pipeline fits an initial model, detects outliers, then fits a no-o
 
 ### 9. Optional moderator and plot guards
 
-Before adapting optional moderator plots, subgroup plots, funnel plots, PET/PEESE, or publication-bias blocks, read `optional_module_guards.md`.
+Before adapting optional moderator plots, subgroup plots, funnel plots, or publication-bias blocks, read `optional_module_guards.md`. If the reference script contains PET/PEESE blocks, drop them when adapting: the default publication-bias check is a single multilevel Egger test.
 
 If a moderator or plot variable is missing or all NA in the new workbook, skip that block with a clear message. Do not run old `Technology_Category`, `Grade_Level`, `Learning_Subject`, `female_per`, or `outcome_domain` blocks just because the old script had them.
 

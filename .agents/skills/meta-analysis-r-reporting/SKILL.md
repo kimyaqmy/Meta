@@ -1,6 +1,6 @@
 ---
 name: meta-analysis-r-reporting
-description: Build reusable R meta-analysis pipelines and R Markdown reports after study data or effect-size data have already been extracted into Excel/CSV files. Use when Codex needs to adapt, generate, audit, or run an R/Rmd script for psychological, education, health, or social-science meta-analysis datasets, especially workflows involving Pearson r/Fisher z, intervention or pre-post SMD/Hedges g, one-group/two-group/RCT designs, separate one-pre-post and two-pre-post workbooks, t/F/z/eta2/r-to-d conversion, gender-proportion moderators, multilevel metafor models, cluster-robust CR2 tests, influence/outlier diagnostics, subgroup/domain/moderator analysis, manuscript-ready effect-size and moderator tables, forest/funnel/scatter figures, publication-bias checks, Word/HTML/PDF R Markdown reports, and portable code that can be reused across projects.
+description: Build, adapt, audit, or run R meta-analysis pipelines and reports from already-extracted Excel/CSV effect-size data in psychology, education, health, or social science. Covers effect-size conversion (Pearson r/Fisher z, SMD/Hedges g, t/F/z/eta2-to-d), multilevel metafor models, cluster-robust CR2 tests, moderator/subgroup analyses, influence and outlier diagnostics, publication-bias checks, forest/funnel figures, and manuscript-ready Word reports. Use whenever the task involves writing or running R/Rmd code for a meta-analysis dataset, reproducing published meta-analytic results, or generating results summaries, tables, and figures from such an analysis.
 ---
 
 # Meta-analysis R
@@ -14,7 +14,7 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
 
 2. Standardize similar column names before analysis.
    - Compare the live workbook's column names to `references/column_name_harmonization.md`.
-   - Rename synonymous columns to the canonical names expected by the R template before converting effect sizes.
+   - Rename synonymous columns to the canonical names used by the chosen reference pipeline before converting effect sizes.
    - Do this as an explicit preprocessing step in the project script; do not manually edit the user's original workbook unless asked.
    - If two columns map to the same canonical field, prefer the more complete column and record the choice in the report.
 
@@ -23,7 +23,8 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
    - If the dataset has intervention/control fields, pre/post means and SDs, `one_group`/`two_group`/`RCT` designs, or SMD/Hedges g outcomes, use `references/primary_students_intervention_smd_pipeline.R` as the main source.
    - If the project has separate one-group and two-group pre/post workbooks, `Exi_intervention`/`Exi_control` flags, RCT/quasi-experimental filtering, `antecedent` recoded to `literacy_type`, or a `gender_proportion` moderator, use `references/ai_literacy_one_two_group_gender_pipeline.R` as the main source.
    - Copy the matching reference pipeline into the project folder and adapt only the required project-specific blocks listed in `references/adapting_reference_pipeline.md`, `references/adapting_intervention_smd_pipeline.md`, or `references/adapting_ai_literacy_gender_pipeline.md`.
-   - Use `scripts/meta_analysis_pipeline.R` only when the user wants a shorter general starter script or when the full reference pipeline is too project-specific for the new dataset.
+   - The reference pipelines are long. Do not read an entire pipeline into context at once; read the matching adapting guide first, then open only the blocks it says need project-specific changes (config, data loading, moderator definitions, labels), keeping validated helper/model/plot blocks unchanged.
+   - If no reference pipeline matches the dataset structure, write a fresh project script that follows the same conventions: explicit config block at the top, `metafor::rma.mv()` multilevel models, `clubSandwich` CR2 tests, guarded optional modules, status tables, and one output folder.
 
 4. Compare the standardized dataset to `references/meta_analysis_columns.md`.
    - Treat that file as the schema map and vocabulary guide.
@@ -36,21 +37,14 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
    - Generate model calls, subgroup splits, figure labels, and output filenames from the new dataset's actual column names and observed levels.
 
 6. Add guards for optional modules before running them.
-   - Read `references/optional_module_guards.md` before adapting moderator, scatter/facet plot, forest, funnel, publication-bias, or PET/PEESE blocks.
+   - Read `references/optional_module_guards.md` before adapting moderator, scatter/facet plot, forest, funnel, or publication-bias blocks.
+   - Publication bias defaults to a single multilevel Egger test: regress effect sizes on their standard errors in the same multilevel model with CR2 robust inference. Do not also fit PET (it is mathematically identical to Egger-on-SE) or PEESE unless the user explicitly asks for them; never present the same regression twice under different names.
    - Creating an optional column as `NA` is not enough to justify running its module.
    - Skip optional modules with a clear `message()` when the required column is missing, all values are missing, there are too few model-ready rows, or a facet/group variable has no levels.
    - If a helper or `tryCatch()` returns `NULL`, do not pipe the result into `select()`, `mutate()`, `print()`, `ggplot()`, or file export. Check `!is.null(res) && nrow(res) > 0` first.
    - When combining moderator count/summary outputs across different moderators, export a long table with explicit `moderator` and `level` columns. Do not bind grouped summaries that still retain original moderator column names such as `design_inferred` and `country`, because different level counts can trigger vctrs recycling errors.
 
-7. Use `scripts/meta_analysis_pipeline.R` as the fallback starter template.
-   - Copy it into the user's project folder or create a project-specific script beside the data file.
-   - Edit only the `CONFIG` block first: `data_path`, `sheet`, id columns, domain/subgroup columns, direction handling, and output directory.
-   - Keep the template's three-stage naming pattern:
-     - `dat_domain_full`: full cleaned analysis base.
-     - `dat_domain_clean`: full base minus influential effects.
-     - `dat_domain_use`: downstream dataset selected by `exclude_influential`.
-
-8. Run the script and verify the outputs.
+7. Run the script and verify the outputs.
    - Confirm how many rows were read, retained, converted to `r`, and included in each model.
    - Check the conversion log before interpreting results.
    - Verify that the overall/main model actually fit before interpreting `main_summary`; if the table contains only `NA` estimates, inspect and report the model error instead of treating it as a result.
@@ -59,7 +53,7 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
    - Keep non-convergent, underpowered, empty subgroup, or missing-field analyses visible in the report instead of silently skipping them.
    - After a run, read `references/warning_triage.md` to decide which warnings are harmless, which need guards, and which need statistical caveats.
 
-9. Generate an R Markdown report when the user asks for results, outcomes, Word/PDF output, summary tables, or figures.
+8. Generate an R Markdown report when the user asks for results, outcomes, Word/PDF output, summary tables, or figures.
    - Read `references/rmarkdown_reporting.md` before creating `.Rmd` output.
    - The Rmd should rerun the analysis or source a deterministic analysis script, then render summary text, effect-size conversion tables, model tables, moderator tables, robust/omnibus test tables, and figures in one document.
    - By default, produce two Word deliverables: `results_summary.docx` and `all_tables_figures_summary.docx`. Create HTML/PDF/Rmd technical reports only when the user explicitly asks for them. Always keep the Word version as a practical fallback for PDF, because users can export the `.docx` to PDF even when LaTeX is missing. For Word output, use table-ready formatting (`knitr::kable` at minimum; `flextable` preferred when available). For PDF output, note that R Markdown needs a LaTeX engine such as TinyTeX/MiKTeX.
@@ -69,17 +63,18 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
    - Add a short description before each major analysis section explaining what the analysis tests, which dataset it uses, and any key assumptions or caveats.
    - Write narrative descriptions as plain Markdown text, not inside `{r}` chunks. Inline expressions such as `` `r nrow(dat)` `` belong in Markdown prose; only executable R statements belong inside R chunks.
    - Do not rely on a previously exported workbook if it might be incomplete; recompute model objects inside the Rmd or source the script and assert objects exist.
-   - Include a manuscript-style moderator table using the same main-result header style when requested or when building Word-ready tables: `Correlate`, `k`, `n`, `r [95% CI]` or `g [95% CI]`, `SE`, `p`, heterogeneity components such as `tau^2`, optional `R^2`, and `Robust Test`. Use moderator names as section rows and indented moderator levels as result rows.
+   - Include a manuscript-style moderator table using an APA-like structure when requested or when building Word-ready tables: `Moderation`, `k`, `n`, `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, `Omnibus Test`, and `status`. Use moderator names as section rows and indented moderator levels as result rows. Keep technical `message` fields out of manuscript-facing moderator tables unless needed to explain a failed model.
    - Include an effect-size audit table listing study/effect ids, source statistic, original effect, converted effect, variance, direction handling, and inclusion status.
-   - Include a manuscript-style overall/main effect table with `Correlate`, `k`, `n`, `yi`, `vi`, `r [95% CI]` or `g [95% CI]`, `SE`, `p`, heterogeneity components such as `tau^2(2)` and `tau^2(3)`, optional `R^2(2)`/`R^2(3)`, and `Robust Test` when available. Do not include a separate `z` column unless the user explicitly asks for it.
+   - Include a manuscript-style overall/main effect table with `model`, dataset label, `k`, `n`, `r [95% CI]` or `g [95% CI]`, a 95% prediction interval (pooled estimate +/- critical value x sqrt(SE^2 + total tau2)), `SE`, `p`, formatted Q statistics such as `Q(504) = 21693.65, p < .001`, and `I2_total`, `I2_between`, and `I2_within`. Do not include a separate `robust_test` or `z` column unless the user explicitly asks for it.
+   - If influence diagnostics flag no effects (or residuals are unavailable), do not repeat the main-model row as a "sensitivity" row in manuscript-facing tables; record the skipped sensitivity model and its reason in the model-status table instead.
    - If the report is intended to check consistency with an article, put the full-data main model first and label it as the article-comparison result. Put influence-cleaned or no-outlier models in a separate sensitivity-analysis section with the exclusion rule and flagged counts.
-   - Include a model-status table whenever the main model, CR2 model, moderator model, PET/PEESE model, or figure model fails; do not let failures appear only as blank cells or all-`NA` rows.
+   - Include a model-status table whenever the main model, CR2 model, moderator model, publication-bias model, or figure model fails; do not let failures appear only as blank cells or all-`NA` rows.
    - When the user asks for a Word summary, a result summary, or a report "like the article/PDF Results section", generate a manuscript-style `Results` document rather than a technical dump. Start with sample descriptives, then overall effect, moderator analyses, sensitivity/influence checks, and publication-bias diagnostics. Write explanatory paragraphs before tables, in the style of journal Results prose.
    - Results prose must report the dataset's unique findings, not generic template descriptions. Avoid filler such as "Moderator analyses were used to evaluate whether..." unless it is immediately followed by substantive findings. State which effects were significant, which levels were strongest/weakest, the direction of continuous moderators, and what bias/sensitivity checks imply.
    - If the user provides a manuscript DOCX/PDF as a style example, use it to learn the desired Results-style format, prose level, and figure/table inclusion logic; do not mechanically copy that manuscript's exact Results structure when the new dataset calls for different sections. For the new summary, include the kinds of tables and figures that would normally appear in the manuscript body Results, and exclude Supplementary Materials/SM items such as `Table S...`, `Figure S...`, or figures/tables only mentioned as being in the Supplementary Materials unless the user explicitly asks for them.
-   - Do not paste unrelated CSV outputs into one large Word table. Split tables by analysis family: overall/main effects, omnibus moderator tests, level-specific moderator estimates, continuous moderators, multilevel Egger, PET/PEESE, and influence diagnostics should be separate small tables with short captions/notes.
-   - In `results_summary.docx`, include a compact moderator overview table when a full moderator table would be too wide. In `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv`, including moderator header rows and level rows. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, show CR2 omnibus `F(df1, df2)` details on omnibus/header rows only and leave the omnibus-row formatted p-value cell blank when the p value is already shown inside the `F(...)` cell. Level rows should show estimates, CIs, counts, p values, status, and message, but not per-level `t(...)` robust-test strings.
-   - Order Word content as narrative -> corresponding table -> corresponding figure. For example, put the full moderator table directly under Moderator Analyses, followed by the combined moderator estimate figure; put continuous moderator tables beside/above their scatter plots; put Egger/PET-PEESE tables in the publication-bias section before the funnel plot.
+   - Do not paste unrelated CSV outputs into one large Word table. Split tables by analysis family: overall/main effects, omnibus moderator tests, level-specific moderator estimates, continuous moderators, the multilevel Egger test, and influence diagnostics should be separate small tables with short captions/notes.
+   - In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, show CR2 omnibus `F(df1, df2)` details on omnibus/header rows only under `Omnibus Test`; level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns.
+   - Order Word content as narrative -> corresponding table -> corresponding figure. For example, put the full moderator table directly under Moderator Analyses, followed by the combined moderator estimate figure; put continuous moderator tables beside/above their scatter plots; put the multilevel Egger table in the publication-bias section before the funnel plot.
    - In the manuscript-style `Results` summary, include only figures that directly support the written narrative. For categorical moderators, prefer a combined moderator estimate plot showing point estimates, confidence intervals, study counts, effect counts, and CI labels over many separate boxplots. Include a scatter plot only for a significant/central continuous moderator, and include a funnel plot only for publication-bias interpretation. Do not include dense forest plots or non-significant moderator figures in this short Word summary unless the user explicitly requests all figures there. In the all-tables-and-figures summary, study-level forest plots should preserve multiple effect sizes within a study row instead of collapsing each study to a single dot, unless the user explicitly requests aggregation. For presentation-ready forest plots, save high-resolution PNGs with a white background, split long study-level forest plots into readable panels of about 30 study rows per image for Word/PDF, and encode effect significance with filled blue dots for effects whose 95% CI excludes 0 and empty blue-outlined dots for effects whose CI includes 0, unless the user specifies another significance rule.
    - Put figure titles and subtitles in figure notes/captions, not as large top-of-plot title/subtitle text. Standalone PNGs should use `labs(caption = "Note. ...")` or equivalent bottom notes, and Word reports should repeat the same note directly below each inserted figure.
    - Funnel plots should use a classic publication-bias display by default: grey panel, black points, reversed standard-error axis, pooled-effect center line, and pseudo 95% funnel guides. Use metric-specific x-axis labels, such as `Effect size (Fisher's z)` for correlation pipelines and `Effect size (Hedges g)` for SMD pipelines. If extreme effects flatten the display, use a readable zoomed funnel and disclose the number of effects outside the displayed window.
@@ -87,14 +82,15 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
    - For manuscript-facing tables, CR2 omnibus results should display as `F(df1, df2) = value, p = ...`, not `Robust F(...) = ...`. It is fine to explain in the methods/note that CR2 robust tests were used, but do not repeat `Robust` inside every table cell.
    - If a categorical moderator's level estimates are available but the omnibus cell says unavailable, debug the CR2 Wald contrast before interpreting it as a statistical result. With `clubSandwich::Wald_test()`, pass an explicit contrast matrix rather than coefficient index numbers, because some `clubSandwich` versions require a matrix and name-parsing helpers can fail on coefficient names.
 
-10. Give the user a run-and-return workflow.
+9. Give the user a run-and-return workflow.
    - If R/Rscript is available in the current environment, run the analysis and render reports directly, then inspect the output folder before answering.
    - If R is not available, provide concise RStudio commands for the user to run: set the working directory, source the script, render Word/HTML, and optionally render PDF with a guarded TinyTeX fallback.
    - Tell the user that after R finishes, they can send the generated output folder or report file back. Then read the saved CSV/XLSX/HTML/PNG files, inspect the figures, verify model-status and warning outputs, and give a short results summary.
    - When reviewing a completed output folder, start with `model_status`, `main_summary`, `moderator_table`, `influence_summary`, `egger`/publication-bias outputs, and the generated figures. Flag any all-`NA` model, failed robust test, blank figure, missing report, or sample-count mismatch.
-   - If Codex can run R locally, do not stop after writing code. Run the R script, save all tables/figures into the output folder, inspect key figures, and create the two default Word reports: `results_summary.docx` with overview, executive summary, key results, and only necessary figures/tables; and `all_tables_figures_summary.docx` containing every generated result table and figure. If R Markdown rendering hangs or LaTeX is missing, build the Word summaries directly from the saved CSV/XLSX/PNG outputs and state the fallback.
+   - If the agent can run R locally, do not stop after writing code. Run the R script, save all tables/figures into the output folder, inspect key figures, and create the two default Word reports: `results_summary.docx` with overview, executive summary, key results, and only necessary figures/tables; and `all_tables_figures_summary.docx` containing every generated result table and figure. If R Markdown rendering hangs or LaTeX is missing, build the Word summaries directly from the saved CSV/XLSX/PNG outputs and state the fallback.
+   - After generating Word reports, visually verify them: render each `.docx` to PDF or page PNGs (for example with LibreOffice headless), then inspect the pages for truncated tables, overflowing columns, missing figures, or broken layout before delivering. Fix and re-render if any page is unreadable.
 
-11. Report results with source-aware caution.
+10. Report results with source-aware caution.
    - State whether results use the full dataset or influence-excluded dataset.
    - When the user's goal is article replication, compare like with like: full-data results to article main results; influence-cleaned results only to article sensitivity/outlier results.
    - If the article says outliers were checked but not excluded, keep the full-data analysis as the primary model and describe influence-cleaned output as an additional sensitivity check.
@@ -105,7 +101,7 @@ description: Build reusable R meta-analysis pipelines and R Markdown reports aft
 
 ## R Template
 
-There are four bundled code sources:
+There are three bundled reference pipelines, each with an adapting guide:
 
 ```text
 references/ip_wellbeing_reference_pipeline.R
@@ -153,7 +149,7 @@ Read this before carrying over any domain, subdomain, construct, moderator, or p
 references/optional_module_guards.md
 ```
 
-Read this before adapting optional moderator, scatter/facet plot, forest, funnel, publication-bias, or PET/PEESE blocks.
+Read this before adapting optional moderator, scatter/facet plot, forest, funnel, or publication-bias blocks.
 
 ```text
 references/warning_triage.md
@@ -167,26 +163,7 @@ references/rmarkdown_reporting.md
 
 Read this when generating `.Rmd`, Word/HTML/PDF reports, manuscript-ready summary tables, effect-size audit tables, moderator tables, robust-test tables, or figures from a meta-analysis pipeline.
 
-Use this shorter bundled script only as a general fallback:
-
-```text
-scripts/meta_analysis_pipeline.R
-```
-
-The shorter script is designed to be general rather than tied to one project. It supports:
-
-- Excel or CSV input.
-- Column-name harmonization through `CONFIG$column_map`.
-- NA-like string normalization.
-- Safe creation of optional columns.
-- Conversion to Pearson `r` from common statistics: Pearson/Spearman r, latent r, phi, Kendall tau, standardized beta, unstandardized beta with CI, t, F, odds ratio, prevalence/risk ratio, chi-square/Cramer's V, and Cohen's d.
-- Fisher z and sampling variance computation.
-- Optional within-study aggregation.
-- Multilevel `metafor::rma.mv()` models.
-- `clubSandwich` CR2 coefficient tests.
-- Leave-one-effect-out influence diagnostics.
-- Domain and subgroup models.
-- CSV outputs and a text report.
+If no reference pipeline matches the dataset, write a fresh project-specific script following the conventions in step 3 instead of looking for a generic starter template; none is bundled.
 
 ## Guardrails
 
@@ -203,6 +180,10 @@ The shorter script is designed to be general rather than tied to one project. It
 - Optional analyses must be data-gated. If a variable was created as an all-NA placeholder, skip its moderator or plot block instead of running it.
 - Optional helper outputs must be guarded. Never pipe or print a possibly `NULL` object.
 - Main model helpers should return both a fit object and a status/error table. When there is no moderator formula, omit `mods` from `metafor::rma.mv()` rather than passing `mods = NULL`.
+- Pseudo-R2 for a moderator must compare the moderator model to a null model refitted on the same analytic subset (rows with non-missing moderator and usable levels), never to the full-data null model.
+- Leave-one-study-out diagnostics must refit the same multilevel model after omitting each study so delta values are on the same scale as the reported pooled effect; do not substitute a simple inverse-variance mean.
+- If residual or influence diagnostics fail, capture and record the error message in the model-status table and use a documented fallback (for example manual marginal standardized residuals); never let diagnostics fail silently.
+- In dplyr filters comparing a data column to a function argument with the same name, use `.env$` (for example `filter(.data$term == .env$target_term)`) to avoid data-masking bugs that silently select the wrong coefficient row.
 - Moderator summaries across multiple variables must be normalized before `bind_rows()`: use columns like `moderator`, `level`, `k_effects`, and `n_studies`, plus numeric summary columns for continuous moderators. Avoid wide per-moderator summary columns that rely on vector recycling.
 - R Markdown reports should be self-contained and reproducible: use relative paths when the Rmd lives beside the data; recompute or source model objects; print all required tables/figures inside chunks; guard every optional table/figure before printing.
 - R Markdown prose must not be wrapped in R chunks. A common parse error is `unexpected symbol: The full...`, which means a narrative sentence was placed inside ```{r}``` fences.

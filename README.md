@@ -1,14 +1,14 @@
 # Meta-analysis R Skills
 
-A focused repository of reusable Codex skills for meta-analysis workflows, especially R-based data analysis, effect-size conversion, robust meta-analytic modeling, diagnostic checking, and manuscript-ready reporting.
+A focused repository of reusable agent skills for meta-analysis workflows, especially R-based data analysis, effect-size conversion, robust meta-analytic modeling, diagnostic checking, and manuscript-ready reporting.
 
-This repository is designed for researchers working with already-extracted study-level or effect-size datasets in Excel or CSV format. It helps Codex generate, adapt, audit, run, and report reproducible R/R Markdown meta-analysis pipelines.
+This repository is designed for researchers working with already-extracted study-level or effect-size datasets in Excel or CSV format. It helps an AI coding agent (Codex, Claude Code, or similar) generate, adapt, audit, run, and report reproducible R/R Markdown meta-analysis pipelines.
 
-## What are Codex Skills?
+## What are Agent Skills?
 
-Codex Skills are portable instruction packages for AI coding agents. A skill is usually a folder containing a `SKILL.md` file, plus optional reference files, scripts, templates, examples, or reporting rules.
+Agent skills are portable instruction packages for AI coding agents. A skill is usually a folder containing a `SKILL.md` file, plus optional reference files, scripts, templates, examples, or reporting rules.
 
-In this repository, the skill tells Codex how to handle meta-analysis projects consistently: inspect the extracted data, identify the correct effect-size family, adapt reusable R pipelines, run `metafor` models, apply CR2 robust tests, check diagnostics, and create manuscript-ready reports.
+In this repository, the skill tells the agent how to handle meta-analysis projects consistently: inspect the extracted data, identify the correct effect-size family, adapt reusable R pipelines, run `metafor` models, apply CR2 robust tests, check diagnostics, and create manuscript-ready reports.
 
 ## Available Skill
 
@@ -22,10 +22,21 @@ In this repository, the skill tells Codex how to handle meta-analysis projects c
 .agents/skills/meta-analysis-r-reporting/SKILL.md
 ```
 
-**Supporting reference file:**
+**Supporting reference files** (in `.agents/skills/meta-analysis-r-reporting/references/`):
 
 ```text
-.agents/skills/meta-analysis-r-reporting/references/rmarkdown_reporting.md
+rmarkdown_reporting.md                          # Word/HTML/PDF report rules
+column_name_harmonization.md                    # canonical column names and synonyms
+meta_analysis_columns.md                        # schema map for analysis fields
+discovering_constructs_and_moderators.md        # derive labels from the live workbook
+optional_module_guards.md                       # guards for optional analysis blocks
+warning_triage.md                               # which R warnings need action
+adapting_reference_pipeline.md                  # guide for the IP/wellbeing pipeline
+adapting_intervention_smd_pipeline.md           # guide for the intervention SMD pipeline
+adapting_ai_literacy_gender_pipeline.md         # guide for the AI-literacy pipeline
+ip_wellbeing_reference_pipeline.R               # full correlation (r/Fisher z) pipeline
+primary_students_intervention_smd_pipeline.R    # full intervention SMD/Hedges g pipeline
+ai_literacy_one_two_group_gender_pipeline.R     # one/two-group pre-post pipeline
 ```
 
 **Use this skill when you need Codex to:**
@@ -120,7 +131,18 @@ Meta/
         └── meta-analysis-r-reporting/
             ├── SKILL.md
             └── references/
-                └── rmarkdown_reporting.md
+                ├── rmarkdown_reporting.md
+                ├── column_name_harmonization.md
+                ├── meta_analysis_columns.md
+                ├── discovering_constructs_and_moderators.md
+                ├── optional_module_guards.md
+                ├── warning_triage.md
+                ├── adapting_reference_pipeline.md
+                ├── adapting_intervention_smd_pipeline.md
+                ├── adapting_ai_literacy_gender_pipeline.md
+                ├── ip_wellbeing_reference_pipeline.R
+                ├── primary_students_intervention_smd_pipeline.R
+                └── ai_literacy_one_two_group_gender_pipeline.R
 ```
 
 ## Typical Use Cases

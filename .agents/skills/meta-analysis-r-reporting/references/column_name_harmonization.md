@@ -6,7 +6,7 @@ Use this reference before running meta-analysis code on a new workbook.
 
 Different extraction sheets often use different names for the same analytic field. Standardize them in code before analysis. Do not edit the source workbook unless the user asks.
 
-Use canonical names that match `scripts/meta_analysis_pipeline.R`, then keep all downstream code using those canonical names.
+Use the canonical names below (shared by the bundled reference pipelines), then keep all downstream code using those canonical names.
 
 ## Canonical fields and common synonyms
 

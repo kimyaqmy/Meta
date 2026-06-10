@@ -1,6 +1,6 @@
 # Meta-analysis Data Columns
 
-Use this reference when adapting `scripts/meta_analysis_pipeline.R`.
+Use this reference as the schema map when adapting any of the bundled reference pipelines or writing a fresh project script.
 
 ## Required for most analyses
 
