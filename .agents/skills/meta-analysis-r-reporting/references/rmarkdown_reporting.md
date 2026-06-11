@@ -152,7 +152,7 @@ Write `Moderator Analyses` like an article Results section:
 - write separate paragraphs for significant or theoretically central moderators;
 - include level-specific tables only for the moderator currently being discussed;
 - do not discuss every nonsignificant moderator at equal length.
-- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns.
+- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns. Continuous moderators belong in this same table as an omnibus/header row plus `Intercept` and `Slope (per unit)` rows; see "Continuous moderators in the same moderation table".
 - Keep the local order as narrative -> table -> matching figure. The combined moderator estimate figure should follow the moderator table, not be delayed until the end of the document.
 
 Split tables by analysis family. Do not combine unrelated outputs into one large table just because they are adjacent in the CSV exports:
@@ -160,7 +160,7 @@ Split tables by analysis family. Do not combine unrelated outputs into one large
 - Table: overall/main effect.
 - Table: omnibus moderator tests.
 - Table: selected level-specific moderator estimates.
-- Table: continuous moderators.
+- Table: continuous moderators (full CR2 slope detail; the omnibus + Intercept + Slope rows also appear inline in the main moderator table).
 - Table: multilevel Egger test.
 - Table: influence diagnostics or excluded/flagged studies, only if needed.
 
@@ -588,6 +588,59 @@ For article-style reporting, use table captions that reveal the analytic sample,
 - `Moderator analyses for overall effect: influence-cleaned sensitivity model`.
 
 Before `dplyr::bind_rows()` combines moderator header rows and level rows, make display-only columns the same type. Header rows often contain pseudo-R2 values and blank estimate cells, while level rows contain numeric estimates and blank omnibus-test cells. Convert manuscript-display columns such as `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, and `Omnibus Test` to character strings before binding; keep count columns such as `k` and `n` numeric.
+
+### Continuous moderators in the same moderation table
+
+Report continuous moderators in the same moderation table as the categorical ones, using the identical schema, not only as a separate slope-only table. Each continuous moderator contributes three rows in the same `moderator_table` columns (`Moderation`/`moderator`, `level`, `k`, `n`, `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, `Omnibus Test`, `status`):
+
+- one **omnibus/header** row (like a categorical moderator header) carrying `k`, `n`, pseudo-R2, and a CR2 robust slope test in `Omnibus Test`;
+- an **Intercept** row (model-based estimate, 95% CI, SE, p);
+- a **Slope (per unit)** row (model-based estimate, 95% CI, SE, p).
+
+Use model-based estimate/CI/SE/p for the Intercept and Slope rows, exactly as categorical cell-means level rows are model-based; reserve the CR2 robust test for the omnibus row. The single-predictor omnibus is the CR2 Wald test on the slope, displayed as `F(df1, df2) = value, p = ...` to match categorical omnibus cells. Compute pseudo-R2 against a null model refitted on the same numeric analytic subset (see the pseudo-R2 rule), and floor each component at 0 with `max(0, .)`; for a non-significant continuous moderator both components are normally ~0 (often slightly negative before flooring), which is correct, not a bug.
+
+```r
+analyse_continuous_moderator <- function(dat, moderator) {
+  dcm <- dat %>% dplyr::mutate(.x = suppressWarnings(as.numeric(.data[[moderator]]))) %>%
+    dplyr::filter(is.finite(.x))
+  if (nrow(dcm) < 10 || dplyr::n_distinct(dcm$.x) < 5) return(NULL)
+
+  fit_cm <- metafor::rma.mv(yi, V = vi, random = ~ 1 | study_id_clean/effect_id_clean,
+                            data = dcm, method = "REML", test = "t", mods = ~ .x)
+  slope_i <- 2L
+  est <- as.numeric(fit_cm$beta); se <- as.numeric(fit_cm$se)
+  ci_lb <- as.numeric(fit_cm$ci.lb); ci_ub <- as.numeric(fit_cm$ci.ub); pv <- as.numeric(fit_cm$pval)
+
+  # CR2 robust omnibus on the slope (explicit contrast matrix, not a coef index).
+  C <- matrix(0, nrow = 1, ncol = length(est)); C[1, slope_i] <- 1
+  W <- clubSandwich::Wald_test(fit_cm, constraints = C, vcov = "CR2",
+                               cluster = dcm$study_id_clean, test = "HTZ")
+  omnibus_label <- sprintf("F(%.0f, %.2f) = %.2f, %s", W$df_num[1], W$df_denom[1], W$Fstat[1],
+                           ifelse(W$p_val[1] < .001, "p < .001", sprintf("p = %.3f", W$p_val[1])))
+
+  # Pseudo-R2 vs null refit on the SAME numeric subset.
+  f0 <- metafor::rma.mv(yi, V = vi, random = ~ 1 | study_id_clean/effect_id_clean,
+                        data = dcm, method = "REML", test = "t")
+  s0 <- f0$sigma2; s1 <- fit_cm$sigma2
+  r2b <- max(0, 100 * (s0[1] - s1[1]) / s0[1]); r2w <- max(0, 100 * (s0[2] - s1[2]) / s0[2])
+
+  header <- tibble::tibble(
+    moderator = moderator, level = moderator, row_type = "omnibus",
+    k = nrow(dcm), n = dplyr::n_distinct(dcm$study_id_clean),
+    `Estimate [95% CI]` = "", SE = "", p = "",
+    R2_between = sprintf("%.1f", r2b), R2_within = sprintf("%.1f", r2w),
+    `Omnibus Test` = omnibus_label, status = "ok")
+  coefs <- tibble::tibble(
+    moderator = moderator, level = c("Intercept", "Slope (per unit)"), row_type = "level",
+    k = NA_integer_, n = NA_integer_,
+    `Estimate [95% CI]` = sprintf("%.2f [%.2f, %.2f]", est, ci_lb, ci_ub),
+    SE = sprintf("%.2f", se), p = format_p(pv),
+    R2_between = "", R2_within = "", `Omnibus Test` = "", status = "ok")
+  dplyr::bind_rows(header, coefs)
+}
+```
+
+Append these rows to `moderator_table` (and a matching one-row-per-moderator entry to `moderator_omnibus`) so categorical and continuous moderators render in one manuscript table. Keep the separate slope-only `continuous_moderators.csv` for full CR2 detail (intercept, slope, SE, df, t, p); add the intercept estimate to it so "intercept and slope" are both reported. Leave `k`/`n` blank on the Intercept/Slope rows (the header carries the totals), mirroring how categorical level rows carry per-level counts while the header carries the moderator total.
 
 ## Table rendering
 
