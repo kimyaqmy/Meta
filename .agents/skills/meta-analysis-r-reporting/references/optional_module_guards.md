@@ -12,7 +12,7 @@ Optional modules must be gated by real data availability. A column that was crea
 - Categorical moderator models, such as region, subject, education stage, measure type, construct, technology category, grade level, or literacy type.
 - Scatter plots with `facet_wrap()`.
 - Forest plots for subsets or subdomains.
-- Funnel plots and the multilevel Egger publication-bias test. (Do not also fit PET, which duplicates Egger-on-SE, or PEESE unless the user explicitly asks.)
+- Funnel plots and the publication-bias suite: the multilevel Egger slope test, the PET and PEESE intercepts, and the conditional PET-PEESE selection (PET is the intercept of the same `yi ~ SE` model as the Egger slope, not a duplicate of it). See `rmarkdown_reporting.md` ("Publication-bias diagnostics").
 - Trim-and-fill or selection models.
 
 ## Minimum checks

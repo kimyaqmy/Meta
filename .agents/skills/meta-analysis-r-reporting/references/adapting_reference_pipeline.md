@@ -122,7 +122,7 @@ Do not change model inputs while only changing display labels.
 
 ### 10. Optional moderator and plot guards
 
-Before adapting optional blocks such as `white_proportion`, `gender_proportion`, scatter plots, moderator plots, funnel plots, publication-bias models, or subgroup forest plots, read `optional_module_guards.md`. If the reference script contains PET/PEESE blocks, drop them when adapting: the default publication-bias check is a single multilevel Egger test.
+Before adapting optional blocks such as `white_proportion`, `gender_proportion`, scatter plots, moderator plots, funnel plots, publication-bias models, or subgroup forest plots, read `optional_module_guards.md`. If the reference script contains PET/PEESE blocks, keep and adapt them: the default publication-bias suite is the multilevel Egger slope plus the PET and PEESE intercepts (bias-adjusted estimates) and the conditional PET-PEESE selection. PET is the intercept of the same `yi ~ SE` model as the Egger slope, not a duplicate of it. See `rmarkdown_reporting.md` ("Publication-bias diagnostics") for the canonical pattern.
 
 If a column is only present because `cols_needed` created it as `NA`, skip its analysis block with a clear message. Do not let all-NA optional columns flow into `facet_wrap()`, `rma.mv()`, funnel plots, or publication-bias models.
 

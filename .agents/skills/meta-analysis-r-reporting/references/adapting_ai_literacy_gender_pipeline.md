@@ -136,7 +136,7 @@ For every new AI-literacy-style meta-analysis, add early inspection blocks for `
 
 ### 10. Verification
 
-Before adapting optional moderator plots, subgroup plots, funnel plots, or publication-bias blocks, read `optional_module_guards.md`. If the reference script contains PET/PEESE blocks, drop them when adapting: the default publication-bias check is a single multilevel Egger test. If `literacy_type`, `gender_proportion`, or any replacement moderator is missing or all NA, skip that block with a clear message rather than running an empty model or plot.
+Before adapting optional moderator plots, subgroup plots, funnel plots, or publication-bias blocks, read `optional_module_guards.md`. If the reference script contains PET/PEESE blocks, keep and adapt them: the default publication-bias suite is the multilevel Egger slope plus the PET and PEESE intercepts (bias-adjusted estimates) and the conditional PET-PEESE selection. PET is the intercept of the same `yi ~ SE` model as the Egger slope, not a duplicate of it; see `rmarkdown_reporting.md` ("Publication-bias diagnostics"). If `literacy_type`, `gender_proportion`, or any replacement moderator is missing or all NA, skip that block with a clear message rather than running an empty model or plot.
 
 If any helper, `tryCatch()`, moderator summary, publication-bias function, or plot constructor returns `NULL` or an empty result, skip downstream `select()`, `mutate()`, `print()`, `ggsave()`, or `write.xlsx()` calls. Guard outputs with `if (!is.null(res) && nrow(res) > 0)` for tables, and `if (!is.null(plot_obj))` for plots.
 

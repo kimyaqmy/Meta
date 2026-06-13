@@ -62,7 +62,7 @@ Clear previously generated figures (and any panel-numbered images) at the start 
 
 Save all generated artifacts into that folder or beside the Rmd when the file type is a rendered report:
 
-- CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `publication_bias.csv` (multilevel Egger test).
+- CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `publication_bias.csv` (multilevel Egger slope + PET/PEESE intercepts), and `pet_peese_summary.csv` (conditional PET-PEESE selection).
 - Optional XLSX workbook: `meta_analysis_results.xlsx`.
 - Figures: forest plots, funnel plots, subgroup plots, and moderator scatter plots as `.png`.
 - Saved source files: copy the main analysis `.R` script plus any helper `.R` or generated `.Rmd` files used for the run into `scripts/` or `source/` under the output folder.
@@ -85,7 +85,7 @@ Every Rmd report should include:
 4. Robust/CR2 table when available.
 5. Moderator analyses table in manuscript-ready format.
 6. Moderator count table in long format exported to CSV.
-7. Publication-bias table: the multilevel Egger test (effect sizes regressed on standard errors with CR2 robust inference). Do not also fit PET (identical to Egger-on-SE) or PEESE unless explicitly requested.
+7. Publication-bias tables: (a) the publication-bias suite — the multilevel Egger slope, the PET intercept, and the PEESE intercept (all CR2-robust within the multilevel model); and (b) the conditional PET-PEESE estimate, which selects the PEESE intercept when the PET intercept is significant one-tailed in the pooled-effect direction and otherwise reports the PET intercept with the conclusion that the bias-adjusted effect is not distinguishable from zero.
 8. Figures: forest plot, funnel plot, and any requested moderator scatter/subgroup figures.
 9. Interpretation notes and limitations, including direction handling and whether results use full or influence-excluded data.
 
@@ -96,7 +96,8 @@ For display safety, Word/PDF report tables should usually use compact columns:
 - main effects: model, dataset, k, n/studies or samples, effect with CI, SE, p, and robust test;
 - moderator omnibus: moderator, status, omnibus test, p, and message;
 - moderator level estimates: moderator or level, k, n/studies, effect with CI, p, robust test, status, and message;
-- publication bias: model, term, k, n/studies, estimate, SE, t/df, p, status, and message;
+- publication bias: model, term, k, n/studies, estimate, SE, t/df, p, ci_lb, ci_ub (or a formatted `estimate_ci`), status, and message — `term` distinguishes the Egger `SE slope` from the PET and PEESE `intercept` rows; intercepts may be back-transformed (e.g. Fisher z to r) for display while the Egger slope stays on its native per-SE scale;
+- conditional PET-PEESE (`pet_peese_summary`): pet intercept, two-tailed p, one-tailed p (pooled-effect direction), decision rule, selected model (PET or PEESE), adjusted estimate with CI, a plain-language `conclusion`, and status;
 - model status: model, status, short message, k, and n/studies.
 
 If a full table is too wide or too long for Word/PDF, show a readable compact view or split it by moderator/analysis family, then point to the complete CSV/XLSX file. Do not squeeze all raw columns into one tiny portrait table.
@@ -116,12 +117,13 @@ Use this default structure:
 
 1. `Results`
 2. `Descriptives for the Final Sample`
-3. `Overall Effect` or `Overall Meta-analysis`
-4. `Moderator Analyses`
-5. Central moderator subsections, such as `Academic Domain`, `Construct`, `Outcome Type`, `Implementation`, or the dataset's actual moderator names.
-6. `Influence and Sensitivity Analyses`
-7. `Publication Bias`
-8. `Files for Full Checking` only if helpful; keep it short.
+3. `Summary of Findings` (executive synthesis: key-findings table + synthesizing narrative)
+4. `Overall Effect` or `Overall Meta-analysis`
+5. `Moderator Analyses`
+6. Central moderator subsections, such as `Academic Domain`, `Construct`, `Outcome Type`, `Implementation`, or the dataset's actual moderator names.
+7. `Influence and Sensitivity Analyses`
+8. `Publication Bias`
+9. `Files for Full Checking` only if helpful; keep it short.
 
 The `Descriptives for the Final Sample` section should report the analytic counts in article-like prose:
 
@@ -135,6 +137,30 @@ For example:
 ```text
 The final analytic dataset consisted of 288 effect sizes from 132 studies and 139 subsamples. PBL was investigated most often (...), followed by PjBL (...) and CBL (...).
 ```
+
+### Summary of Findings (executive synthesis)
+
+Open the Results, right after the descriptives, with a `Summary of Findings` section. This is the concrete form of the "executive summary / key results" the `results_summary.docx` deliverable calls for: an at-a-glance synthesis before the detailed sections, so a reader sees every headline result in one place. It is especially valuable when the analysis has multiple sets or families (for example adaptive vs maladaptive outcomes, or several outcome domains); for a single-set analysis it is one row (or full-data plus sensitivity rows).
+
+The section has two parts:
+
+1. A compact **key-findings table**, one row per analysis set / family / main model, with columns:
+   - set/model label, `k`, `n`;
+   - pooled effect `[95% CI]` (back-transformed to `r` or on the `g` scale, as appropriate) and `p`;
+   - 95% prediction interval;
+   - `I2` total / between / within;
+   - significant moderators (names, or `none`);
+   - publication-bias summary: the Egger `p` and the conditional PET-PEESE adjusted estimate, worded `not distinguishable from 0` when the PET test is not significant.
+
+2. A short **synthesizing narrative**, one paragraph per set, in plain manuscript prose that pulls together: the pooled effect with a direction/magnitude interpretation; the prediction interval in plain language; heterogeneity (the `Q` test and the `I2` decomposition); the significant omnibus moderators with their CR2 `F` statistics (or an explicit statement that none reached significance); the influence/outlier outcome; and the publication-bias result (Egger slope plus the conditional PET-PEESE estimate, using the `not distinguishable from zero` wording for a non-significant PET and the high-`I2` caveat).
+
+Example narrative paragraph for one set:
+
+```text
+Maladaptive social functioning. The pooled correlation was r = 0.18 [0.12, 0.24] (Fisher z = 0.184, CR2 robust p < .001), based on 205 effect sizes from 42 studies; because IPC is coded as a destructive construct, this positive association indicates that higher interparental conflict was associated with more maladaptive social-functioning outcomes. The 95% prediction interval on the r scale was [-0.21, 0.51], the range in which the true correlation of a new comparable study is expected to fall. Heterogeneity was substantial relative to sampling error (Q(204) = 980.4, p < .001; I2 total = 86.1%, of which 41.2% between studies and 44.9% within studies). Significant omnibus moderators (p < .05): sf_domain_cat (F(2, 18.4) = 5.10, p = .017). Cook's D screening flagged 3 effects from 2 studies; the no-outlier sensitivity pooled r was 0.16 [0.11, 0.22]. Publication-bias checks: the multilevel Egger funnel-asymmetry test gave slope = -0.02, p = .956; the conditional PET-PEESE bias-adjusted estimate was not distinguishable from zero (PET selected; intercept r = 0.14 [-0.05, 0.32] shown for reference, one-tailed p = .101).
+```
+
+Assemble both parts entirely from the result objects already computed for the detailed sections (the pooled fit, the moderator omnibus table, the influence summary, `publication_bias`, and `pet_peese_summary`); never refit models for the summary, so the headline numbers cannot drift from the tables they summarize. A working implementation is `key_findings` and `summary_findings_par()` in `testing_2/run_ipc_sf_meta_analysis.R`.
 
 Write the `Overall Effect` section as prose first, then table:
 
@@ -152,7 +178,7 @@ Write `Moderator Analyses` like an article Results section:
 - write separate paragraphs for significant or theoretically central moderators;
 - include level-specific tables only for the moderator currently being discussed;
 - do not discuss every nonsignificant moderator at equal length.
-- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns. Continuous moderators belong in this same table as an omnibus/header row plus `Intercept` and `Slope (per unit)` rows; see "Continuous moderators in the same moderation table".
+- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. Likewise, do not display a separate `moderator` column beside the level label in the manuscript table: when the raw table carries both a `moderator` and a `level` column they overlap (the omnibus/header row already shows the moderator name), so collapse them into one label column — moderator name on the header row, the level (optionally indented) on level rows — exactly as the `Moderation` pattern does. Keep the `moderator` column only in the `moderator_table.csv`/XLSX exports, where it groups level rows by their moderator. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns. Continuous moderators belong in this same table as an omnibus/header row plus `Intercept` and `Slope (per unit)` rows; see "Continuous moderators in the same moderation table".
 - Keep the local order as narrative -> table -> matching figure. The combined moderator estimate figure should follow the moderator table, not be delayed until the end of the document.
 
 Split tables by analysis family. Do not combine unrelated outputs into one large table just because they are adjacent in the CSV exports:
@@ -161,16 +187,16 @@ Split tables by analysis family. Do not combine unrelated outputs into one large
 - Table: omnibus moderator tests.
 - Table: selected level-specific moderator estimates.
 - Table: continuous moderators (full CR2 slope detail; the omnibus + Intercept + Slope rows also appear inline in the main moderator table).
-- Table: multilevel Egger test.
+- Table: publication-bias checks (Egger slope, PET intercept, PEESE intercept) plus the conditional PET-PEESE estimate.
 - Table: influence diagnostics or excluded/flagged studies, only if needed.
 
-For publication bias, use a short prose paragraph followed by the table:
+For publication bias, use a short prose paragraph, then the suite table, then a sentence stating the conditional PET-PEESE result and its table:
 
 ```text
-A multilevel Egger test regressed effect sizes on their standard errors within the multilevel model, with CR2 robust inference. In the full-data model, the Egger slope was ..., indicating ... . Because dependent effect sizes are nested within studies, this check should be interpreted cautiously.
+Three checks were estimated within the multilevel model with CR2 robust inference: a multilevel Egger regression (slope of effect sizes on their standard errors, a funnel-asymmetry test), PET, and PEESE. PET-PEESE is a two-step conditional procedure (Stanley & Doucouliagos, 2014): PET regresses effect sizes on their standard errors and its intercept estimates the effect of an ideal, infinitely precise study (SE = 0); this intercept is first tested one-tailed in the direction of the pooled effect. If the test is not significant, the bias-adjusted effect is reported as not distinguishable from zero (the PET intercept and CI are shown for reference, not as a point estimate of the true effect). If it is significant, the PEESE intercept (a regression on the sampling variance) is reported instead, because PET underestimates true nonzero effects while PEESE is less biased in that case. Here the Egger slope was ..., and the conditional PET-PEESE result was ... . Because dependent effect sizes are nested within studies, these checks should be interpreted cautiously; with very high heterogeneity (total I^2 > ~90%), PET-PEESE adjustments are unreliable (Stanley, 2017) and should be read qualitatively.
 ```
 
-The Egger table should include `model`, `term`, `k`, `n`, `estimate`, `SE`, `t`, `df`, `p`, and `status`. Do not add PET or PEESE rows: PET duplicates the Egger-on-SE regression, and PEESE is out of scope unless the user explicitly requests it.
+The suite table should include `model`, `term`, `k`, `n`, `estimate`, `SE`, `t`, `df`, `p`, a CI (`ci_lb`/`ci_ub` or `estimate_ci`), and `status`, with one row each for the Egger slope, the PET intercept, and the PEESE intercept. Add a small conditional `pet_peese_summary` table (PET intercept, one/two-tailed p, decision rule, selected model, adjusted estimate + CI, conclusion). Extract the Egger slope and the PET/PEESE intercepts by coefficient name, never by row position, and do not relabel the slope and the intercept as the same quantity.
 
 Use clean manuscript formatting:
 
@@ -225,28 +251,64 @@ If the article reports records, subsamples, and effect sizes separately, show al
 
 ## Publication-bias diagnostics
 
-For dependent effect-size datasets fitted with `metafor::rma.mv()`, implement Egger as a multilevel meta-regression by treating the standard error as a moderator:
+For dependent effect-size datasets fitted with `metafor::rma.mv()`, fit two multilevel meta-regressions and read three coefficients from them. Egger and PET share the `yi ~ SE` model: the Egger test is its **slope** (funnel asymmetry), PET is its **intercept** (bias-adjusted effect at SE = 0). PEESE is the **intercept** of `yi ~ variance` (`I(sei^2)`, which equals `vi`). Extract every coefficient by name (`names(coef(fit))`), never by row position, so the `sei` slope is not accidentally exported as the intercept or as `NA`.
 
 ```r
-dat_egger <- dat %>% dplyr::mutate(sei = sqrt(vi))
-fit_egger <- metafor::rma.mv(
-  yi = yi,
-  V = vi,
+dat_bias <- dat %>% dplyr::mutate(sei_mod = sqrt(vi))
+
+# Egger (slope of sei_mod) and PET (intercept) come from this model:
+fit_pet <- metafor::rma.mv(
+  yi = yi, V = vi,
   random = ~ 1 | study_id_clean/effect_id_clean,
-  mods = ~ sei,
-  data = dat_egger,
-  method = "REML",
-  test = "t"
+  mods = ~ sei_mod, data = dat_bias, method = "REML", test = "t"
 )
-egger_cr2 <- clubSandwich::coef_test(
-  fit_egger,
-  vcov = "CR2",
-  cluster = dat_egger$study_id_clean,
-  test = "Satterthwaite"
+# PEESE (intercept) regresses on the sampling variance:
+fit_peese <- metafor::rma.mv(
+  yi = yi, V = vi,
+  random = ~ 1 | study_id_clean/effect_id_clean,
+  mods = ~ I(sei_mod^2), data = dat_bias, method = "REML", test = "t"
+)
+
+# Pull one named coefficient with a CR2 Satterthwaite-df 95% CI.
+bias_row <- function(fit, model_label, term_label, coef_name) {
+  cn <- names(coef(fit)); i <- which(cn == coef_name)
+  ct <- clubSandwich::coef_test(fit, vcov = "CR2",
+          cluster = dat_bias$study_id_clean, test = "Satterthwaite")
+  est <- as.numeric(fit$beta[i]); se <- ct$SE[i]; df <- ct$df_Satt[i]
+  crit <- if (is.na(df) || df <= 0) qnorm(.975) else qt(.975, df)
+  tibble::tibble(model = model_label, term = term_label,
+    k = nrow(dat_bias), n = dplyr::n_distinct(dat_bias$study_id_clean),
+    estimate = est, SE = se, t = ct$tstat[i], df = df, p = ct$p_Satt[i],
+    ci_lb = est - crit * se, ci_ub = est + crit * se, status = "ok")
+}
+
+publication_bias <- dplyr::bind_rows(
+  bias_row(fit_pet,   "Multilevel Egger", "SE slope",  "sei_mod"),
+  bias_row(fit_pet,   "PET",              "Intercept", "intrcpt"),
+  bias_row(fit_peese, "PEESE",            "Intercept", "intrcpt")
+)
+
+# Conditional PET-PEESE (Stanley & Doucouliagos, 2014): one-tailed PET test
+# in the direction of the pooled effect (sign of fit_full's intercept).
+pet  <- publication_bias[publication_bias$model == "PET", ]
+peese <- publication_bias[publication_bias$model == "PEESE", ]
+pooled_dir <- sign(as.numeric(fit_full$beta[1]))
+pet_p_one <- if (sign(pet$estimate) == pooled_dir) pet$p / 2 else 1 - pet$p / 2
+selected  <- if (pet_p_one < .05) peese else pet
+pet_peese_summary <- tibble::tibble(
+  pet_intercept = pet$estimate, pet_p_one_tailed = pet_p_one,
+  decision_rule = "PET one-tailed p < .05 -> report PEESE intercept; else report PET intercept",
+  selected_model = if (pet_p_one < .05) "PEESE" else "PET",
+  adjusted_estimate = selected$estimate, adjusted_ci_lb = selected$ci_lb,
+  adjusted_ci_ub = selected$ci_ub,
+  conclusion = if (pet_p_one < .05)
+    "PET significant: genuine nonzero effect indicated; PEESE intercept is the bias-adjusted estimate."
+  else
+    "PET not significant: bias-adjusted effect not distinguishable from zero; intercept and CI shown for reference."
 )
 ```
 
-Report the `sei` slope as the multilevel Egger test. When extracting CR2 rows, do not rely only on row names; use `names(coef(fit_egger))` or an explicit coefficient/term column so the `sei` slope is not accidentally exported as `NA`.
+Report the `sei_mod` slope as the multilevel Egger test and the two `intrcpt` rows as PET and PEESE. For Fisher-z/r analyses, back-transform the PET/PEESE **intercepts** to r for display (the Egger slope is per-SE and stays on the z scale). Follow the conditional `conclusion` in the narrative: when PET is not significant, state that the bias-adjusted effect is not distinguishable from zero rather than reporting the intercept as a point estimate, and add the high-I^2 caveat (Stanley, 2017). Working implementations of this exact pattern live in `testing/run_testing_meta_analysis.R` (`fit_bias_model` + the `pet_peese_summary` block) and `testing_2/run_ipc_sf_meta_analysis.R` (`bias_coef_row` + `pet_peese`).
 
 ## Rmd Prose vs Code Chunks
 
@@ -591,7 +653,7 @@ Before `dplyr::bind_rows()` combines moderator header rows and level rows, make 
 
 ### Continuous moderators in the same moderation table
 
-Report continuous moderators in the same moderation table as the categorical ones, using the identical schema, not only as a separate slope-only table. Each continuous moderator contributes three rows in the same `moderator_table` columns (`Moderation`/`moderator`, `level`, `k`, `n`, `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, `Omnibus Test`, `status`):
+Report continuous moderators in the same moderation table as the categorical ones, using the identical schema, not only as a separate slope-only table. Each continuous moderator contributes three rows in the same `moderator_table` columns (`Moderation`/`moderator`, `level`, `k`, `n`, `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, `Omnibus Test`, `status`). If the raw table keeps separate `moderator` and `level` columns (as below), collapse them to the single label column at display time and drop the redundant `moderator` column, per the manuscript-table rule above:
 
 - one **omnibus/header** row (like a categorical moderator header) carrying `k`, `n`, pseudo-R2, and a CR2 robust slope test in `Omnibus Test`;
 - an **Intercept** row (model-based estimate, 95% CI, SE, p);
