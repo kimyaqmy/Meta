@@ -95,7 +95,7 @@ For display safety, Word/PDF report tables should usually use compact columns:
 
 - main effects: model, dataset, k, n/studies or samples, effect with CI, SE, p, and robust test;
 - moderator omnibus: moderator, status, omnibus test, p, and message;
-- moderator level estimates: moderator or level, k, n/studies, effect with CI, p, robust test, status, and message;
+- moderator level estimates: one visible `Moderation` label column, k, n/studies, effect with CI, p, omnibus test on header rows only, and status;
 - publication bias: model, term, k, n/studies, estimate, SE, t/df, p, ci_lb, ci_ub (or a formatted `estimate_ci`), status, and message — `term` distinguishes the Egger `SE slope` from the PET and PEESE `intercept` rows; intercepts may be back-transformed (e.g. Fisher z to r) for display while the Egger slope stays on its native per-SE scale;
 - conditional PET-PEESE (`pet_peese_summary`): pet intercept, two-tailed p, one-tailed p (pooled-effect direction), decision rule, selected model (PET or PEESE), adjusted estimate with CI, a plain-language `conclusion`, and status;
 - model status: model, status, short message, k, and n/studies.
@@ -157,7 +157,7 @@ The section has two parts:
 Example narrative paragraph for one set:
 
 ```text
-Maladaptive social functioning. The pooled correlation was r = 0.18 [0.12, 0.24] (Fisher z = 0.184, CR2 robust p < .001), based on 205 effect sizes from 42 studies; because IPC is coded as a destructive construct, this positive association indicates that higher interparental conflict was associated with more maladaptive social-functioning outcomes. The 95% prediction interval on the r scale was [-0.21, 0.51], the range in which the true correlation of a new comparable study is expected to fall. Heterogeneity was substantial relative to sampling error (Q(204) = 980.4, p < .001; I2 total = 86.1%, of which 41.2% between studies and 44.9% within studies). Significant omnibus moderators (p < .05): sf_domain_cat (F(2, 18.4) = 5.10, p = .017). Cook's D screening flagged 3 effects from 2 studies; the no-outlier sensitivity pooled r was 0.16 [0.11, 0.22]. Publication-bias checks: the multilevel Egger funnel-asymmetry test gave slope = -0.02, p = .956; the conditional PET-PEESE bias-adjusted estimate was not distinguishable from zero (PET selected; intercept r = 0.14 [-0.05, 0.32] shown for reference, one-tailed p = .101).
+Maladaptive social functioning. The pooled correlation was r = 0.18 [0.12, 0.24] (Fisher z = 0.184, CR2 robust p < .001), based on 205 effect sizes from 42 studies; because IPC is coded as a destructive construct, this positive association indicates that higher interparental conflict was associated with more maladaptive social-functioning outcomes. The 95% prediction interval on the r scale was [-0.21, 0.51], the range in which the true correlation of a new comparable study is expected to fall. Heterogeneity was substantial relative to sampling error (Q(204) = 980.4, p < .001; I2 total = 86.1%, of which 41.2% between studies and 44.9% within studies). Significant omnibus moderators (p < .05): sf_domain_cat (F(2, 18.4) = 5.10, p = .017). Cook's D screening flagged 3 effect sizes from 2 studies. The sensitivity model removed those effect sizes, retained 202 effects from 41 studies, and dropped 1 study entirely; its pooled r was 0.16 [0.11, 0.22]. Publication-bias checks: the multilevel Egger funnel-asymmetry test gave slope = -0.02, p = .956; the conditional PET-PEESE bias-adjusted estimate was not distinguishable from zero (PET selected; intercept r = 0.14 [-0.05, 0.32] shown for reference, one-tailed p = .101).
 ```
 
 Assemble both parts entirely from the result objects already computed for the detailed sections (the pooled fit, the moderator omnibus table, the influence summary, `publication_bias`, and `pet_peese_summary`); never refit models for the summary, so the headline numbers cannot drift from the tables they summarize. A working implementation is `key_findings` and `summary_findings_par()` in `testing_2/run_ipc_sf_meta_analysis.R`.
@@ -178,7 +178,7 @@ Write `Moderator Analyses` like an article Results section:
 - write separate paragraphs for significant or theoretically central moderators;
 - include level-specific tables only for the moderator currently being discussed;
 - do not discuss every nonsignificant moderator at equal length.
-- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. Likewise, do not display a separate `moderator` column beside the level label in the manuscript table: when the raw table carries both a `moderator` and a `level` column they overlap (the omnibus/header row already shows the moderator name), so collapse them into one label column — moderator name on the header row, the level (optionally indented) on level rows — exactly as the `Moderation` pattern does. Keep the `moderator` column only in the `moderator_table.csv`/XLSX exports, where it groups level rows by their moderator. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns. Continuous moderators belong in this same table as an omnibus/header row plus `Intercept` and `Slope (per unit)` rows; see "Continuous moderators in the same moderation table".
+- In `results_summary.docx` and `all_tables_figures_summary.docx`, include the full manuscript-facing `moderator_table.csv` unless the user explicitly asks for a shorter table. Keep technical row markers such as `row_type` internal; do not display or export them in manuscript-facing moderator tables. Likewise, do not display or export a separate `moderator` column beside the level label in manuscript-facing moderator tables: when the raw table carries both a `moderator` and a `level` column they overlap (the omnibus/header row already shows the moderator name), so collapse them into one label column -- moderator name on the header row, the level (optionally indented) on level rows -- exactly as the `Moderation` pattern does. If grouping keys are needed for auditing, save them in a separate technical diagnostic file, not in the manuscript-facing moderator table. For categorical moderators, display CR2 omnibus `F(df1, df2)` details only on omnibus/header rows under `Omnibus Test`. Level rows should show estimates, CIs, counts, p values, and status, but not per-level `t(...)` robust-test strings or technical message columns. Continuous moderators belong in this same table as an omnibus/header row plus `Intercept` and `Slope (per unit)` rows; see "Continuous moderators in the same moderation table".
 - Keep the local order as narrative -> table -> matching figure. The combined moderator estimate figure should follow the moderator table, not be delayed until the end of the document.
 
 Split tables by analysis family. Do not combine unrelated outputs into one large table just because they are adjacent in the CSV exports:
@@ -416,7 +416,7 @@ For multilevel `rma.mv()` objects, extract coefficients with `stats::coef(fit)` 
 
 Do not let model failures turn into all-`NA` result rows without explanation. In R Markdown reports, use a model helper that returns both `fit` and a `status` table, and print the status table whenever a model fails.
 
-Describe influence cleaning explicitly. Use a transparent rule, such as Cook's distance from the full model with influential effects flagged at `Cook's D > 4/k`, where `k` is the number of model-ready effects. State that this is effect-level screening, not manual study deletion, and report both the number of flagged effects and the number of studies represented among those effects. Export the full influence diagnostic table to CSV.
+Describe influence cleaning explicitly. Use a transparent rule, such as Cook's distance from the full model with influential effects flagged at `Cook's D > 4/k`, where `k` is the number of model-ready effects. State that this is effect-level screening, not manual study deletion. Report the number of flagged effects, studies represented among those flagged effects, effects/studies retained in the sensitivity model, and studies removed entirely because no effects remained after screening. In main-effect and sensitivity tables, note that `k_effects` and `n_studies` show retained model counts, not the number removed. Export the full influence diagnostic table to CSV.
 
 When any effects are flagged, also include a dedicated table of the flagged influential effects in the manuscript-facing sensitivity section of `results_summary.docx` (not only the all-tables document). List one row per flagged effect with its study and effect ids, a few identifying descriptors (the central moderators, e.g. intervention type, domain, level), the effect size and SE, its Cook's D, the cutoff, and how far it exceeds the cutoff (a `ratio = Cook's D / cutoff`), sorted by Cook's D descending. This lets a reader see exactly which effects drove the sensitivity analysis. Export the same table to CSV (for example `influence_flagged_effects.csv`).
 
@@ -507,7 +507,7 @@ For example, `Robust F(5, 16.02) = 9.46, p = <.001` should be displayed as `F(5,
 
 The moderator table should resemble manuscript tables, not just raw coefficient output. By default, use the same visible header style as the overall/main effect table. Use one section/header row per moderator and one indented row per level.
 
-Recommended APA-style columns:
+Recommended APA-style display columns:
 
 - `Moderation`
 - `k`
@@ -521,6 +521,29 @@ Recommended APA-style columns:
 - `status`
 
 For correlation/Fisher-z analyses, report back-transformed `r [95% CI]` values inside `Estimate [95% CI]`. For SMD analyses, report Hedges `g [95% CI]` or SMD on the model scale. Use `k` for effect sizes and `n` for distinct studies unless the source workbook has a reliable participant `N` column and the user asks for participant counts.
+
+Do not display a separate raw `moderator` column in manuscript-facing moderator tables. If the internal result object uses `moderator`, `level`, and `row_type` for grouping, create a report-facing display table first: the visible `Moderation` column should contain the moderator name on omnibus/header rows and the indented level label on level rows. Keep raw grouping fields out of `results_summary.docx`, `all_tables_figures_summary.docx`, and any manuscript-facing table preview.
+
+Display-table pattern:
+
+```r
+make_moderator_display_table <- function(moderator_table) {
+  moderator_table %>%
+    dplyr::mutate(
+      Moderation = dplyr::case_when(
+        row_type == "omnibus" ~ as.character(moderator),
+        !is.na(level) ~ paste0("  ", as.character(level)),
+        TRUE ~ ""
+      )
+    ) %>%
+    dplyr::select(
+      Moderation, k, n, `Estimate [95% CI]`, SE, p,
+      R2_between, R2_within, `Omnibus Test`, status
+    )
+}
+
+moderator_display <- make_moderator_display_table(moderator_table)
+```
 
 Pattern:
 
@@ -653,13 +676,13 @@ Before `dplyr::bind_rows()` combines moderator header rows and level rows, make 
 
 ### Continuous moderators in the same moderation table
 
-Report continuous moderators in the same moderation table as the categorical ones, using the identical schema, not only as a separate slope-only table. Each continuous moderator contributes three rows in the same `moderator_table` columns (`Moderation`/`moderator`, `level`, `k`, `n`, `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, `Omnibus Test`, `status`). If the raw table keeps separate `moderator` and `level` columns (as below), collapse them to the single label column at display time and drop the redundant `moderator` column, per the manuscript-table rule above:
+Report continuous moderators in the same moderation table as the categorical ones, using the identical schema, not only as a separate slope-only table. Each continuous moderator contributes three rows in the raw `moderator_table` columns (`moderator`, `level`, `row_type`, `k`, `n`, `Estimate [95% CI]`, `SE`, `p`, `R2_between`, `R2_within`, `Omnibus Test`, `status`). Before any report display, pass this raw table through `make_moderator_display_table()` so only `Moderation` is visible and the redundant `moderator` column is removed:
 
 - one **omnibus/header** row (like a categorical moderator header) carrying `k`, `n`, pseudo-R2, and a CR2 robust slope test in `Omnibus Test`;
-- an **Intercept** row (model-based estimate, 95% CI, SE, p);
-- a **Slope (per unit)** row (model-based estimate, 95% CI, SE, p).
+- an **Intercept** row (model-based estimate with CR2 SE/CI/p when available);
+- a **Slope (per unit)** row (model-based estimate with CR2 SE/CI/p when available).
 
-Use model-based estimate/CI/SE/p for the Intercept and Slope rows, exactly as categorical cell-means level rows are model-based; reserve the CR2 robust test for the omnibus row. The single-predictor omnibus is the CR2 Wald test on the slope, displayed as `F(df1, df2) = value, p = ...` to match categorical omnibus cells. Compute pseudo-R2 against a null model refitted on the same numeric analytic subset (see the pseudo-R2 rule), and floor each component at 0 with `max(0, .)`; for a non-significant continuous moderator both components are normally ~0 (often slightly negative before flooring), which is correct, not a bug.
+Use the fitted model's coefficient estimates for the Intercept and Slope rows, but use `clubSandwich::coef_test()` CR2 robust SE/df/p and CR2 CIs (`estimate +/- tcrit(df) * CR2_SE`) for manuscript-facing coefficient uncertainty when available. If `coef_test()` fails, fall back to model-based SE/CI/p and mark the coefficient rows as `model-based fallback`. This prevents contradictions where the one-predictor omnibus CR2 F test is significant but the displayed slope row appears nonsignificant because it used model-based p values. The single-predictor omnibus is the CR2 Wald test on the slope, displayed as `F(df1, df2) = value, p = ...` to match categorical omnibus cells. Compute pseudo-R2 against a null model refitted on the same numeric analytic subset (see the pseudo-R2 rule), and floor each component at 0 with `max(0, .)`; for a non-significant continuous moderator both components are normally ~0 (often slightly negative before flooring), which is correct, not a bug.
 
 ```r
 analyse_continuous_moderator <- function(dat, moderator) {
@@ -670,8 +693,27 @@ analyse_continuous_moderator <- function(dat, moderator) {
   fit_cm <- metafor::rma.mv(yi, V = vi, random = ~ 1 | study_id_clean/effect_id_clean,
                             data = dcm, method = "REML", test = "t", mods = ~ .x)
   slope_i <- 2L
-  est <- as.numeric(fit_cm$beta); se <- as.numeric(fit_cm$se)
-  ci_lb <- as.numeric(fit_cm$ci.lb); ci_ub <- as.numeric(fit_cm$ci.ub); pv <- as.numeric(fit_cm$pval)
+  est <- as.numeric(fit_cm$beta)
+  se_model <- as.numeric(fit_cm$se)
+  ci_lb <- as.numeric(fit_cm$ci.lb); ci_ub <- as.numeric(fit_cm$ci.ub)
+  pv <- as.numeric(fit_cm$pval)
+
+  ct <- tryCatch(clubSandwich::coef_test(fit_cm, vcov = "CR2",
+        cluster = dcm$study_id_clean, test = "Satterthwaite"), error = function(e) NULL)
+  cr2_ok <- !is.null(ct) &&
+    all(c("SE", "df_Satt", "p_Satt") %in% names(ct)) &&
+    nrow(ct) >= length(est)
+  se <- se_model
+  coef_status <- "model-based fallback"
+  if (cr2_ok) {
+    idx <- seq_along(est)
+    se <- as.numeric(ct$SE[idx])
+    pv <- as.numeric(ct$p_Satt[idx])
+    tcrit <- stats::qt(.975, df = as.numeric(ct$df_Satt[idx]))
+    ci_lb <- est - tcrit * se
+    ci_ub <- est + tcrit * se
+    coef_status <- "ok"
+  }
 
   # CR2 robust omnibus on the slope (explicit contrast matrix, not a coef index).
   C <- matrix(0, nrow = 1, ncol = length(est)); C[1, slope_i] <- 1
@@ -697,7 +739,7 @@ analyse_continuous_moderator <- function(dat, moderator) {
     k = NA_integer_, n = NA_integer_,
     `Estimate [95% CI]` = sprintf("%.2f [%.2f, %.2f]", est, ci_lb, ci_ub),
     SE = sprintf("%.2f", se), p = format_p(pv),
-    R2_between = "", R2_within = "", `Omnibus Test` = "", status = "ok")
+    R2_between = "", R2_within = "", `Omnibus Test` = "", status = coef_status)
   dplyr::bind_rows(header, coefs)
 }
 ```
@@ -706,10 +748,11 @@ Append these rows to `moderator_table` (and a matching one-row-per-moderator ent
 
 ## Table rendering
 
-Use `knitr::kable()` at minimum:
+Use `knitr::kable()` at minimum. For moderator analyses, render the display table, not the raw table:
 
 ```r
-knitr::kable(moderator_table, caption = "Moderator analyses for overall effect")
+moderator_display <- make_moderator_display_table(moderator_table)
+knitr::kable(moderator_display, caption = "Moderator analyses for overall effect")
 ```
 
 For Word/HTML output, prefer `flextable` if available; for PDF/LaTeX output, use `knitr::kable()` because `flextable` is not the safest default for PDF.
@@ -741,15 +784,15 @@ render_meta_table <- function(dat, caption = NULL, bold_rows = integer()) {
 }
 
 render_meta_table(
-  moderator_table,
+  moderator_display,
   caption = "Moderator analyses for overall effect",
-  bold_rows = which(moderator_table$Moderation %in% categorical_moderators)
+  bold_rows = which(moderator_display$Moderation %in% categorical_moderators)
 )
 ```
 
 Do not use screenshots as table content. Screenshots can guide formatting, but tables must be generated from model objects and conversion logs.
 
-Before printing a table in Word/PDF, reduce it to display columns and format long fields. For moderator tables, drop technical `message` columns from manuscript-facing CSV/XLSX/Word outputs, keep CR2 `F(...)` strings only in `Omnibus Test` on moderator/header rows, and round numeric columns. Preserve complete technical diagnostics in `model_status.csv` or a separate audit table when needed.
+Before printing a table in Word/PDF, reduce it to display columns and format long fields. For moderator tables, drop raw grouping columns such as `moderator`, `level`, and `row_type` after creating the single `Moderation` label column; do not use `select(-row_type)` alone because it leaves the redundant `moderator` column visible. Drop technical `message` columns from manuscript-facing CSV/XLSX/Word outputs, keep CR2 `F(...)` strings only in `Omnibus Test` on moderator/header rows, and round numeric columns. Preserve complete technical diagnostics in `model_status.csv` or a separate audit table when needed.
 
 ## Figures
 
