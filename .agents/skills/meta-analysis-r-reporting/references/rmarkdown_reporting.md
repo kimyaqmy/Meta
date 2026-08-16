@@ -65,13 +65,15 @@ Save all generated artifacts into that folder or beside the Rmd when the file ty
 - CSV tables: `main_summary.csv`, `model_status.csv`, `effect_size_audit.csv`, `moderator_table.csv`, `moderator_counts.csv`, `influence_summary.csv`, `influence_diagnostics.csv`, `publication_bias.csv` (multilevel Egger slope + PET/PEESE intercepts), and `pet_peese_summary.csv` (conditional PET-PEESE selection).
 - Optional XLSX workbook: `meta_analysis_results.xlsx`.
 - Figures: forest plots, funnel plots, subgroup plots, and moderator scatter plots as `.png`.
-- Saved source files: copy the main analysis `.R` script plus any helper `.R` or generated `.Rmd` files used for the run into `scripts/` or `source/` under the output folder.
-- Source manifest: `script_manifest.csv` listing source path, saved path, run timestamp, checksum, and file size for every saved R/Rmd source file.
-- Text manifest: `output_manifest.csv` or `meta_analysis_report.txt` listing every output path, row count/status, date-time generated, and saved source files.
+- Saved source files: copy the actual workflow sources used for the run into `scripts/` or `source/` under the output folder, such as pipeline definition files, analysis helper files, cleaning scripts, sourced utility files, and generated `.Rmd` files. Do not copy unrelated scripts as provenance for a pipeline run. Clear stale copied source files before writing the current source snapshot.
+- Source manifest: `script_manifest.csv` listing source path, saved path, run timestamp, checksum when available, and file size for every saved R/Rmd source file.
+- Status and text manifests: `report_status.csv` for report existence/success, plus `output_manifest.csv` or `meta_analysis_report.txt` listing every output path, row count/status, date-time generated, and saved source files.
 - Word reports: create two files by default when the user asks for a summary/report:
   - `results_summary.docx`: overview, executive summary, key results, and only relevant text-matched figures/tables.
   - `all_tables_figures_summary.docx`: a checking document containing all generated result tables and every generated figure with short captions.
 - Optional technical reports: create HTML, PDF, or Rmd reports only when the user explicitly asks for them.
+
+For long or frequently revised analyses, prefer a cached pipeline such as `targets`. Split the workflow into cleaning, model computation, table export, figure rendering, report building, and manifest/provenance targets. Keep expensive `metafor`/CR2 model fits upstream from table, figure, and Word-report targets so report-layout or figure-styling edits do not refit models. Use a stable output folder for cached pipeline outputs and write manifests as the terminal target after all reports and exported files exist.
 
 When R is not available to the agent, provide RStudio commands and ask the user to run them. After the user returns the output folder or rendered report, inspect the folder directly: read the CSV/XLSX summaries, open or view figure files, check model-status rows, and then give a concise summary of the results and any warnings.
 
@@ -131,12 +133,21 @@ The `Descriptives for the Final Sample` section should report the analytic count
 - number of studies/records (`n`);
 - number of subsamples/groups when available;
 - distribution of central categorical variables, such as intervention type, domain, educational level, publication status, design, duration, or construct.
+- exclusions and model-ready counts when the extraction file includes rows that were not usable;
+- per-set effect/study counts when the analysis has multiple main outcome families;
+- a study-level age summary using one averaged mean age per study when age is available;
+- major outcome-category and region/geography distributions, formatted as `category (k effects, n studies)` or `region (k effects, n studies, % of studies)`;
+- non-r effect types retained by conversion or extraction coding, with a pointer to the effect-size audit table.
 
 For example:
 
 ```text
 The final analytic dataset consisted of 288 effect sizes from 132 studies and 139 subsamples. PBL was investigated most often (...), followed by PjBL (...) and CBL (...).
 ```
+
+For social-science association meta-analyses, a manuscript-ready analytic-sample paragraph can be a single dense paragraph: `Of X extracted effect sizes, Y were model-ready across Z distinct studies (excluded: ...). The [set 1] analysis comprised ...; the [set 2] analysis comprised ... . Study-level mean age ... . Major outcome categories were ... . Region distribution ... . Non-r effect types retained as correlations were ...; see the audit tables.`
+
+When a manuscript Table 1 is needed, create it as a separate study-characteristics artifact, not by copying screenshots. Use one row per study id, not one row per paper when a paper contributes multiple studies. Include author label, year, country, sample size, mean age, sex/gender composition when available, key exposure/outcome dimensions, study design, report type, and risk-of-bias score. Align the sex/gender column with the moderator used in the analysis: if models use `pct_female`, report `% Female`; if models use `pct_male`, report `% Male`; do not switch between them by deriving `100 - pct_female` unless the user asks for that display or the model uses the derived variable. Use full citation metadata when available to format author labels: one author surname for one author, `A & B` for two authors, `A, B, & C` for three authors, and `A et al.` for more than three authors. Put `RoB Score (%)` as the final column and calculate it as `100 * number of Yes responses / applicable items`, where `Yes = 1`, `No` and `Unclear = 0`, and `Not applicable` is excluded from the denominator.
 
 ### Summary of Findings (executive synthesis)
 
@@ -148,25 +159,27 @@ The section has two parts:
    - set/model label, `k`, `n`;
    - pooled effect `[95% CI]` (back-transformed to `r` or on the `g` scale, as appropriate) and `p`;
    - 95% prediction interval;
-   - `I2` total / between / within;
+   - `Q_statistics`, `I2` total / between / within, and tau2/tau total / between / within;
    - significant moderators (names, or `none`);
    - publication-bias summary: the Egger `p` and the conditional PET-PEESE adjusted estimate, worded `not distinguishable from 0` when the PET test is not significant.
 
-2. A short **synthesizing narrative**, one paragraph per set, in plain manuscript prose that pulls together: the pooled effect with a direction/magnitude interpretation; the prediction interval in plain language; heterogeneity (the `Q` test and the `I2` decomposition); the significant omnibus moderators with their CR2 `F` statistics (or an explicit statement that none reached significance); the influence/outlier outcome; and the publication-bias result (Egger slope plus the conditional PET-PEESE estimate, using the `not distinguishable from zero` wording for a non-significant PET and the high-`I2` caveat).
+2. A short **synthesizing narrative**, one paragraph per set, in plain manuscript prose that pulls together: the pooled effect with a direction/magnitude interpretation; the prediction interval in plain language; heterogeneity (the `Q` test, the `I2` decomposition, and tau2/tau components); the significant omnibus moderators with their CR2 `F` statistics (or an explicit statement that none reached significance); the influence/outlier outcome including the sensitivity prediction interval and tau2/tau estimates; and the publication-bias result (Egger slope plus the conditional PET-PEESE estimate, using the `not distinguishable from zero` wording for a non-significant PET and the high-`I2` caveat).
 
 Example narrative paragraph for one set:
 
 ```text
-Maladaptive social functioning. The pooled correlation was r = 0.18 [0.12, 0.24] (Fisher z = 0.184, CR2 robust p < .001), based on 205 effect sizes from 42 studies; because IPC is coded as a destructive construct, this positive association indicates that higher interparental conflict was associated with more maladaptive social-functioning outcomes. The 95% prediction interval on the r scale was [-0.21, 0.51], the range in which the true correlation of a new comparable study is expected to fall. Heterogeneity was substantial relative to sampling error (Q(204) = 980.4, p < .001; I2 total = 86.1%, of which 41.2% between studies and 44.9% within studies). Significant omnibus moderators (p < .05): sf_domain_cat (F(2, 18.4) = 5.10, p = .017). Cook's D screening flagged 3 effect sizes from 2 studies. The sensitivity model removed those effect sizes, retained 202 effects from 41 studies, and dropped 1 study entirely; its pooled r was 0.16 [0.11, 0.22]. Publication-bias checks: the multilevel Egger funnel-asymmetry test gave slope = -0.02, p = .956; the conditional PET-PEESE bias-adjusted estimate was not distinguishable from zero (PET selected; intercept r = 0.14 [-0.05, 0.32] shown for reference, one-tailed p = .101).
+Maladaptive social functioning. The pooled correlation was r = 0.18 [0.12, 0.24] (Fisher z = 0.184, CR2 robust p < .001), based on 205 effect sizes from 42 studies; because IPC is coded as a destructive construct, this positive association indicates that higher interparental conflict was associated with more maladaptive social-functioning outcomes. The 95% prediction interval on the r scale was [-0.21, 0.51], the range in which the true correlation of a new comparable study is expected to fall. Heterogeneity was substantial relative to sampling error (Q(204) = 980.4, p < .001; I2 total = 86.1%, of which 41.2% between studies and 44.9% within studies; tau2 total = 0.014, tau total = 0.118; tau2 between = 0.007, tau between = 0.084; tau2 within = 0.007, tau within = 0.084). Significant omnibus moderators (p < .05): sf_domain_cat (F(2, 18.4) = 5.10, p = .017). Cook's D screening flagged 3 effect sizes from 2 studies. The sensitivity model removed those effect sizes, retained 202 effects from 41 studies, and dropped 1 study entirely; its pooled r was 0.16 [0.11, 0.22], with 95% PI [-0.17, 0.45] and tau2 total = 0.011 / tau total = 0.105. Publication-bias checks: the multilevel Egger funnel-asymmetry test gave slope = -0.02, p = .956; the conditional PET-PEESE bias-adjusted estimate was not distinguishable from zero (PET selected; intercept r = 0.14 [-0.05, 0.32] shown for reference, one-tailed p = .101).
 ```
 
-Assemble both parts entirely from the result objects already computed for the detailed sections (the pooled fit, the moderator omnibus table, the influence summary, `publication_bias`, and `pet_peese_summary`); never refit models for the summary, so the headline numbers cannot drift from the tables they summarize. A working implementation is `key_findings` and `summary_findings_par()` in `testing_2/run_ipc_sf_meta_analysis.R`.
+Assemble both parts entirely from the result objects already computed for the detailed sections (the pooled fit, the moderator omnibus table, the influence summary, `publication_bias`, and `pet_peese_summary`); never refit models for the summary, so the headline numbers cannot drift from the tables they summarize.
+
+When comparing outcome families whose raw effect signs have opposite substantive meanings, add a separate harmonized-direction analysis. Define a common interpretive direction before fitting the combined model, create a harmonized effect-size column by sign-flipping only the outcome family that needs reversal, keep variances unchanged, and export an audit table showing which effects were flipped. For example, if adaptive outcomes are coded so negative correlations mean poorer functioning and maladaptive outcomes are coded so positive correlations mean poorer functioning, use `yi_harmonized = -yi` for adaptive outcomes and `yi_harmonized = yi` for maladaptive outcomes, then test outcome family/valence as a moderator. Keep the original separate-set analyses unchanged unless the user explicitly asks for a harmonized-only workflow.
 
 Write the `Overall Effect` section as prose first, then table:
 
 - identify the model type, such as three-level multilevel meta-analysis;
 - state whether the result is full data or influence-cleaned;
-- report `g [95% CI]` or `r [95% CI]`, the 95% prediction interval, SE, p, and CR2 robust test;
+- report `g [95% CI]` or `r [95% CI]`, the 95% prediction interval, SE, p, CR2 robust test, Q statistic, I2 decomposition, and tau2/tau estimates;
 - interpret direction and magnitude cautiously;
 - put influence-cleaned/no-outlier results in a sensitivity paragraph unless it is the user's defined main model.
 
@@ -308,7 +321,7 @@ pet_peese_summary <- tibble::tibble(
 )
 ```
 
-Report the `sei_mod` slope as the multilevel Egger test and the two `intrcpt` rows as PET and PEESE. For Fisher-z/r analyses, back-transform the PET/PEESE **intercepts** to r for display (the Egger slope is per-SE and stays on the z scale). Follow the conditional `conclusion` in the narrative: when PET is not significant, state that the bias-adjusted effect is not distinguishable from zero rather than reporting the intercept as a point estimate, and add the high-I^2 caveat (Stanley, 2017). Working implementations of this exact pattern live in `testing/run_testing_meta_analysis.R` (`fit_bias_model` + the `pet_peese_summary` block) and `testing_2/run_ipc_sf_meta_analysis.R` (`bias_coef_row` + `pet_peese`).
+Report the `sei_mod` slope as the multilevel Egger test and the two `intrcpt` rows as PET and PEESE. For Fisher-z/r analyses, back-transform the PET/PEESE **intercepts** to r for display (the Egger slope is per-SE and stays on the z scale). Follow the conditional `conclusion` in the narrative: when PET is not significant, state that the bias-adjusted effect is not distinguishable from zero rather than reporting the intercept as a point estimate, and add the high-I^2 caveat (Stanley, 2017).
 
 ## Rmd Prose vs Code Chunks
 
@@ -376,9 +389,16 @@ Recommended columns for the overall/main table:
 - `n_studies`
 - `n_samples` when available
 - `r [95% CI]` or `g [95% CI]`
+- `PI (r)` or `PI (g)`
 - `SE`
 - `p`
 - `Q_statistics`, formatted as `Q(df) = value, p < .001`
+- `tau2_total`
+- `tau_total`
+- `tau2_between`
+- `tau_between`
+- `tau2_within`
+- `tau_within`
 - `I2_total`
 - `I2_between`
 - `I2_within`
@@ -398,25 +418,56 @@ format_ci <- function(lb, ub) {
   ifelse(is.na(lb) | is.na(ub), "", sprintf("[%.2f, %.2f]", lb, ub))
 }
 
-main_summary_raw <- dplyr::bind_rows(
+extract_tau_components <- function(fit) {
+  s2 <- if (is.null(fit) || is.null(fit$sigma2)) rep(NA_real_, 2) else as.numeric(fit$sigma2)
+  tau2_between <- if (length(s2) >= 1) s2[1] else NA_real_
+  tau2_within <- if (length(s2) >= 2) s2[2] else NA_real_
+  tau2_total <- sum(c(tau2_between, tau2_within), na.rm = TRUE)
+  tibble::tibble(
+    tau2_total = tau2_total,
+    tau_total = sqrt(tau2_total),
+    tau2_between = tau2_between,
+    tau_between = sqrt(tau2_between),
+    tau2_within = tau2_within,
+    tau_within = sqrt(tau2_within)
+  )
+}
+
+model_summary_row <- function(fit, label, dat) {
+  pred <- tryCatch(predict(fit), error = function(e) NULL)
+  i2 <- multilevel_i2(fit, dat$vi)
+  tibble::tibble(
+    model = label,
+    k_effects = nrow(dat),
+    n_studies = dplyr::n_distinct(dat$study_id_clean),
+    `r [95% CI]` = format_est_r(fit$beta[1], fit$ci.lb, fit$ci.ub),
+    `PI (r)` = if (!is.null(pred)) format_ci(metafor::transf.ztor(pred$pi.lb),
+                                             metafor::transf.ztor(pred$pi.ub)) else "",
+    SE = sprintf("%.3f", fit$se[1]),
+    p = format_p(fit$pval[1]),
+    Q_statistics = format_q_statistic(fit),
+    I2_total = round(i2$total, 1),
+    I2_between = round(i2$between, 1),
+    I2_within = round(i2$within, 1)
+  ) %>%
+    dplyr::bind_cols(extract_tau_components(fit))
+}
+
+main_summary <- dplyr::bind_rows(
   model_summary_row(fit_full, "Overall: full data", dat_full),
   model_summary_row(fit_clean, "Overall: no-outlier data", dat_clean)
 )
-
-main_summary <- main_summary_raw %>%
-  dplyr::mutate(
-    Q_statistics = format_q_statistic(fit),
-    I2_total = i2$total,
-    I2_between = i2$between_study,
-    I2_within = i2$within_study
-  )
 ```
+
+In implementation, calculate the prediction interval and tau2/tau components inside the row helper from the same fitted object used for that row. Do not compute them once from `fit_full` and reuse them for no-outlier rows. For a three-level `rma.mv()` model with `random = ~ 1 | study/effect`, the usual mapping is `fit$sigma2[1]` = between-study tau2 and `fit$sigma2[2]` = within-study/effect-level tau2; total tau2 is their sum, and each tau is the square root of its tau2.
 
 For multilevel `rma.mv()` objects, extract coefficients with `stats::coef(fit)` and `stats::vcov(fit)` rather than relying only on `summary(fit)$beta`, because the summary object can differ across `metafor` versions or fail silently when the model did not fit.
 
 Do not let model failures turn into all-`NA` result rows without explanation. In R Markdown reports, use a model helper that returns both `fit` and a `status` table, and print the status table whenever a model fails.
 
 Describe influence cleaning explicitly. Use a transparent rule, such as Cook's distance from the full model with influential effects flagged at `Cook's D > 4/k`, where `k` is the number of model-ready effects. State that this is effect-level screening, not manual study deletion. Report the number of flagged effects, studies represented among those flagged effects, effects/studies retained in the sensitivity model, and studies removed entirely because no effects remained after screening. In main-effect and sensitivity tables, note that `k_effects` and `n_studies` show retained model counts, not the number removed. Export the full influence diagnostic table to CSV.
+
+When any effects are flagged, include a compact sensitivity table in `results_summary.docx` comparing the full-data and no-outlier overall models. At minimum, include `model`, `k_effects`, `n_studies`, pooled effect with 95% CI, 95% prediction interval, and tau2/tau total/between/within. The sensitivity prose should name both the no-outlier pooled effect and its prediction interval; the table should carry the full tau2/tau values.
 
 When any effects are flagged, also include a dedicated table of the flagged influential effects in the manuscript-facing sensitivity section of `results_summary.docx` (not only the all-tables document). List one row per flagged effect with its study and effect ids, a few identifying descriptors (the central moderators, e.g. intervention type, domain, level), the effect size and SE, its Cook's D, the cutoff, and how far it exceeds the cutoff (a `ratio = Cook's D / cutoff`), sorted by Cook's D descending. This lets a reader see exactly which effects drove the sensitivity analysis. Export the same table to CSV (for example `influence_flagged_effects.csv`).
 
@@ -848,19 +899,18 @@ if (nrow(forest_dat) >= 2) {
     ggplot2::scale_y_continuous(breaks = study_order$study_row, labels = study_order$label) +
     ggplot2::labs(
       x = "Effect size",
-      y = NULL,
-      caption = "Note. Study-level forest plot with effect-size CIs. Filled blue dots have 95% CIs excluding 0; empty dots include 0."
+      y = NULL
     ) +
-    ggplot2::theme(plot.caption = ggplot2::element_text(hjust = 0))
+    ggplot2::theme(plot.caption = ggplot2::element_blank())
 } else {
   plot.new()
   text(.5, .5, "Forest plot skipped: fewer than two studies.")
 }
 ```
 
-In the actual Rmd, wrap it in an R chunk named `forest-plot` with a figure caption and `fig.height = 8`, then place the code above in the chunk.
+In the actual Rmd, wrap it in an R chunk named `forest-plot` with a figure caption and `fig.height = 8`, then place the code above in the chunk. Keep titles/subtitles out of the plot image; put the figure note in the Word/Rmd text below the inserted image, for example: `Note. Study-level forest plot with effect-size CIs. Filled blue dots have 95% CIs excluding 0; empty dots include 0.`
 
-For report and presentation exports, save study-level forest plots as high-resolution PNGs with a white background before inserting them into Word. When the study-level forest plot has more than about 30-40 study rows, split it into multiple readable panels (about 30-40 study rows per image, configurable) rather than one oversized vertical PNG. Each chunk should keep multiple effect-size dots/CIs on the same study row, retain the zero and pooled-effect reference lines, and use clear Word headings such as `Study-level forest plot, studies 1-40`. Put titles/subtitles inside figure notes rather than top-of-plot text: standalone PNGs should use a bottom caption such as `labs(caption = "Note. Study-level forest plot with effect-size CIs. Studies 1-40 of 132; ...")`, and Word reports should repeat the same note below the inserted image. A good export default for a chunked dense forest plot is at least 450-600 dpi with a wider canvas than the inserted Word size, rendered through a high-quality device such as `ragg::agg_png` for crisp text, for example `ggsave("study_level_forest_full_data_part_01.png", plot = forest_plot, width = 12, height = max(6, 0.28 * n_studies_in_chunk + 1.8), dpi = 600, limitsize = FALSE, bg = "white", device = ragg::agg_png)`.
+For report and presentation exports, save study-level forest plots as high-resolution PNGs with a white background before inserting them into Word. Prefer one plot per main analysis set when the y-axis labels remain readable, even for moderately long sets; use a larger canvas, higher DPI, and larger y-axis label font rather than immediately chunking. Each plot should keep one row per study, multiple effect-size dots/CIs on the same study row, the zero reference line, and an overall pooled-effect row or diamond at the bottom/top of the study list. Use filled blue dots when the 95% CI excludes 0 and hollow blue-outlined dots when the 95% CI includes 0. Split the forest plot into multiple readable panels only when the full-set version is genuinely unreadable in Word/PDF. A good export default for a full-set dense forest plot is a wide canvas with at least 600 dpi through a high-quality device such as `ragg::agg_png`, for example `ggsave("study_level_forest.png", plot = forest_plot, width = 20, height = max(8, 0.50 * (n_studies + 1) + 3), dpi = 600, limitsize = FALSE, bg = "white", device = ragg::agg_png)`. If splitting is needed, use clear Word headings such as `Study-level forest plot, studies 1-40` and build the report's figure list from the files written in the current run.
 
 Also include funnel plots and key moderator plots when data permit:
 
